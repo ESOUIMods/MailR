@@ -2071,7 +2071,7 @@ function MailR.Init(eventCode, addOnName)
     name               = "MailR",
     displayName        = "|cFFFFFF MailR",
     author             = "Sharlikran, Pills, Ravalox Darkshire, Calia1120",
-    version            = "2.5.01", --self.codeVersion,
+    version            = "2.5.02", --self.codeVersion,
     slashCommand       = "/mailer",
     registerForRefresh = true,
     --registerForDefaults = true,
