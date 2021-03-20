@@ -299,7 +299,13 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   fromSystem, fromCustomerService, returned, numAttachments, attachedMoney,
   codAmount, expiresInDays, secsSinceReceived   = GetMailItemInfo(mailId)
 
+  --[[ TODO: Update the concept of isSentMail such that whne you send mail
+  it is auto saved and flagged as sent. Received Mail is flagged when saved.
+  However, both types then indicate that it is a MailR mail and not player or
+  system mail.
+  ]]--
   MailR.currentMessageInfo["isSentMail"]        = MailR.IsMailIdSentMail(mailId)
+  MailR.currentMessageInfo["isReceivedMail"]    = false
   MailR.currentMessageInfo["displayName"]       = senderDisplayName
   MailR.currentMessageInfo["recipient"]         = senderDisplayName
   MailR.currentMessageInfo["characterName"]     = senderCharacterName
@@ -927,14 +933,12 @@ end
 
 function MailR.SaveMail()
   MailR.dm("Debug", "SaveMail")
-  local mail        = MailR.currentMessageInfo
-  local savedMailId = MailR.GenerateMailId()
-  while MailR.SavedMail.sent_messages["MailR_" .. tostring(mailId)] ~= nil do
-    savedMailID = MailR.GenerateMailId()
-  end
-  mail.isSentMail                                                  = false
-  MailR.SavedMail.sent_messages["MailR_" .. tostring(savedMailId)] = MailR.CopyMessage(MailR.currentMessageInfo)
-  MailR.SavedMail.sent_count                                       = MailR.SavedMail.sent_count + 1
+  local mail                                 = MailR.currentMessageInfo
+  local savedMailId                          = "MailR_" .. Id64ToString(MailR.currentMessageInfo.mailId)
+  mail.isSentMail                            = false
+  mail.isReceivedMail                        = true
+  MailR.SavedMail.sent_messages[savedMailId] = MailR.CopyMessage(MailR.currentMessageInfo)
+  MailR.SavedMail.sent_count                 = MailR.SavedMail.sent_count + 1
   MAIL_INBOX:RefreshData()
 end
 
