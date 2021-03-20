@@ -5,8 +5,10 @@ Version: 2.4.0.0
 Date: 2018-05-17 Calia1120
 ]]
 
+local LAM2 = LibAddonMenu2
 -- GLOBALS
 MailR = {}
+MailR.Name = "MailR"
 -- Set to true if you want to see debug output to console/chat window
 MailR.DEBUG = false
 -- default mail color
@@ -67,7 +69,7 @@ MailR.SavedMail_defaults = {
 	sent_messages = {},
 	inbox_count = 0,
 	inbox_messages = {},
-	show_donation = true, 
+	show_donation = true,
 	throttle_time = 1 --seconds (can be fractional)
 }
 -- saved mail
@@ -128,9 +130,27 @@ MailR.localeStringMap = {
 		["Attached Gold: "] = "Or Attaché: ",
 		["COD: "] = "COD: ",
 		["Postage: "] = "Affranchissement: "
-	}
+	},
+	["RU"] = {
+		["Reply"] = "Reply",
+		["Forward"] = "Forward",
+		["Reply To Message"] = "Reply To Message",
+		["Forward Message"] = "Forward Message",
+		["Original Message"] = "Original Message",
+		["Mail Guild"] = "Mail Guild",
+		["From: "] = "From: ",
+		["Fwd: "] = "Fwd: ",
+		["Re: "] = "Re: ",
+		["Attachments: "] = "Attachments: ",
+		["To:"] = "To:",
+		["Received:"] = "Received:",
+		["Sent:"] = "Sent:",
+		["Attached Gold: "] = "Attached Gold: ",
+		["COD: "] = "COD: ",
+		["Postage: "] = "Postage: "
+	},
 }
-local colorYellow 		= "|cFFFF00" 	-- yellow 
+local colorYellow 		= "|cFFFF00" 	-- yellow
 local colorSoftYellow	= "|cCCCC00"    -- Duller Yellow for Description
 local colorRed 			= "|cFF0000" 	-- Red
 local colorRavalox		= "|cB60000"    -- Ravalox Red  -- B6 = Red 182  a brighter 82 red
@@ -139,6 +159,68 @@ local lang
 local ShowPlayerContextMenu_Orig = CHAT_SYSTEM.ShowPlayerContextMenu
 local GetNextMailId_Orig = GetNextMailId
 local ShowPlayerInteractMenu_Orig = ZO_PlayerToPlayer.ShowPlayerInteractMenu
+
+if LibDebugLogger then
+  logger = LibDebugLogger.Create(MailR.Name)
+  MailR.logger = logger
+end
+local SDLV = DebugLogViewer
+if SDLV then MailR.viewer = true else MailR.viewer = false end
+
+local function create_log(log_type, log_content)
+  if log_type == "Debug" then
+    MailR.logger:Debug(log_content)
+  end
+  if log_type == "Info" then
+    MailR.logger:Info(log_content)
+  end
+  if log_type == "Verbose" then
+    MailR.logger:Verbose(log_content)
+  end
+  if log_type == "Warn" then
+    MailR.logger:Warn(log_content)
+  end
+end
+
+local function emit_message(log_type, text)
+  if (text == "") then
+    text = "[Empty String]"
+  end
+  create_log(log_type, text)
+end
+
+local function emit_table(log_type, t, indent, table_history)
+  indent = indent or "."
+  table_history = table_history or {}
+
+  for k, v in pairs(t) do
+    local vType = type(v)
+
+    emit_message(log_type, indent .. "(" .. vType .. "): " .. tostring(k) .. " = " .. tostring(v))
+
+    if (vType == "table") then
+      if (table_history[v]) then
+        emit_message(log_type, indent .. "Avoiding cycle on table...")
+      else
+        table_history[v] = true
+        emit_table(log_type, v, indent .. "  ", table_history)
+      end
+    end
+  end
+end
+
+function MailR.dm(log_type, ...)
+  if not MailR.logger then return end
+  for i = 1, select("#", ...) do
+    local value = select(i, ...)
+    if (type(value) == "table") then
+      emit_table(log_type, value)
+    else
+      emit_message(log_type, tostring(value))
+    end
+  end
+end
+
 -- temp fix for Wykyyds Mailbox
 if type(WYK_MailBox) == "table" then
 	WYK_MailBox.ReadMail = function() return end
@@ -281,9 +363,9 @@ function MailR.SetMailboxActive(eventCode)
 		else
 			MailR.DonateButton:SetAnchor(TOPLEFT, ZO_MailInbox, TOPLEFT, 100, 4)
 		end
-		MailR.DonateButton:SetHidden(false) 
-	else 
-		MailR.DonateButton:SetHidden(true) 
+		MailR.DonateButton:SetHidden(false)
+	else
+		MailR.DonateButton:SetHidden(true)
 	end
 end
 
@@ -301,10 +383,10 @@ end
 function MailR.HideGuildies()
 	Guildies:SetHidden(true)
 	MailR.guildies_visible = false
-	MailR.GuildDropdown:ClearItems()
-	MailR.GuildRankDropdown:ClearItems()
-	MailR.GuildStatusDropdown:ClearItems()
-	MailR.GuildLogicDropdown:ClearItems()
+	-- MailR.GuildDropdown:ClearItems()
+	-- MailR.GuildRankDropdown:ClearItems()
+	-- MailR.GuildStatusDropdown:ClearItems()
+	-- MailR.GuildLogicDropdown:ClearItems()
 	MailR.guilds = {}
 	MailR.guildranks = {}
 	MailR.guildies = {}
@@ -800,8 +882,9 @@ end
 
 function MailR.OnMouseUp(control, button, upInside)
 	MAIL_INBOX:Row_OnMouseUp(control)
+    if not control then return end
 	local mailId = control.dataEntry.data.mailId
- 
+
 	if MailR.IsMailIdSentMail(mailId) then
 		return
 	end
@@ -855,8 +938,12 @@ function MailR.CheckMailIdEquality(mailId1, mailId2)
 	return mailId1 == mailId2
 end
 
-function MailR.MailIdEquality(data1, data2)
-	return MailR.CheckMailIdEquality(data1.mailId, data2.mailId)
+function MailR.MailIdEquality(...)
+  MailR.dm("Debug", "MailIdEquality")
+  MailR.dm("Debug", self)
+  MailR.dm("Debug", ...)
+	-- return MailR.CheckMailIdEquality(data1.mailId, data2.mailId)
+	return true
 end
 
 function MailR.GetMailData(self, mailId)
@@ -891,7 +978,15 @@ function MailR.OverloadMailInbox()
 	MAIL_INBOX.RequestReadMessage = MailR.RequestReadMessage
 	MAIL_INBOX.HasAlreadyReportedSelectedMail = MailR.HasAlreadyReportedSelectedMail
 	local MAIL_DATA = 1
-	ZO_ScrollList_SetEqualityFunction(MAIL_INBOX.list, MAIL_DATA, MailR.MailIdEquality)
+  MailR.dm("Debug", MAIL_DATA)
+  local mailListData = MAIL_INBOX.masterList or {}
+  mailListData[1] = {nothing = true}
+  mailListData.dataTypes = {}
+  mailListData.dataTypes[MAIL_DATA] = {}
+  mailListData.dataTypes[MAIL_DATA].equalityFunction = {}
+  MailR.dm("Debug", mailListData)
+  MailR.dm("Debug", "ZO_ScrollList_SetEqualityFunction")
+	ZO_ScrollList_SetEqualityFunction(mailListData, MAIL_DATA, function(...) MailR.MailIdEquality(...) end)
 	GetNextMailId = MailR.GetNextMailId
 	CHAT_SYSTEM.ShowPlayerContextMenu = MailR.ShowPlayerContextMenu
 	ZO_PlayerToPlayer.ShowPlayerInteractMenu = MailR.ShowPlayerInteractMenu
@@ -920,8 +1015,8 @@ function MailR.MailGuild()
 	if not SCENE_MANAGER:IsShowing("mailSend") then return end
 	if MailR.DEBUG then d("Mailing Guildies") end
 	if MailR.guildies_visible then MailR.HideGuildies() return end
-	MailR.ShowGuildies()
-	MailR.GuildControl:Update()
+	--MailR.ShowGuildies()
+	--MailR.GuildControl:Update()
 end
 
 function MailRGuild:Update()
@@ -998,25 +1093,25 @@ function MailR.OverloadMailSend()
 	local dropdownContainer = CreateControlFromVirtual("GuildiesDropdown", Guildies, "ZO_StatsDropdownRow")
 	dropdownContainer:SetAnchor(TOPLEFT, GuildiesHeading, BOTTOMLEFT, 0, 16)
 	dropdownContainer:GetNamedChild("Dropdown"):SetWidth(200)
-	MailR.GuildDropdown = dropdownContainer.dropdown
+	-- MailR.GuildDropdown = dropdownContainer.dropdown
 	GuildiesDropdown:SetWidth(200)
 
 	local dropdownLogicContainer = CreateControlFromVirtual("GuildiesLogicDropdown", Guildies, "ZO_StatsDropdownRow")
 	dropdownLogicContainer:SetAnchor(TOPLEFT, GuildiesDropdown, TOPRIGHT, 2, 0)
 	dropdownLogicContainer:GetNamedChild("Dropdown"):SetWidth(60)
-	MailR.GuildLogicDropdown = dropdownLogicContainer.dropdown
+	-- MailR.GuildLogicDropdown = dropdownLogicContainer.dropdown
 	GuildiesLogicDropdown:SetWidth(60)
 
 	local dropdownRankContainer = CreateControlFromVirtual("GuildiesRankDropdown", Guildies, "ZO_StatsDropdownRow")
 	dropdownRankContainer:SetAnchor(TOPLEFT, GuildiesLogicDropdown, TOPRIGHT, 2, 0)
 	dropdownRankContainer:GetNamedChild("Dropdown"):SetWidth(128)
-	MailR.GuildRankDropdown = dropdownRankContainer.dropdown
+	-- MailR.GuildRankDropdown = dropdownRankContainer.dropdown
 	GuildiesRankDropdown:SetWidth(128)
 
 	local dropdownStatusContainer = CreateControlFromVirtual("GuildiesStatusDropdown", Guildies, "ZO_StatsDropdownRow")
 	dropdownStatusContainer:SetAnchor(TOPLEFT, GuildiesRankDropdown, TOPRIGHT, 2, 0)
 	dropdownStatusContainer:GetNamedChild("Dropdown"):SetWidth(88)
-	MailR.GuildStatusDropdown = dropdownStatusContainer.dropdown
+	-- MailR.GuildStatusDropdown = dropdownStatusContainer.dropdown
 	GuildiesStatusDropdown:SetWidth(88)
 
 
@@ -1057,11 +1152,11 @@ function MailR.Guild_MouseUp(control, button, upInside)
 	-- contro.data.name, etc
 	local pressed_button = 1
 	local api_ver = GetAPIVersion()
-	
+
 	if  api_ver > 100011 then pressed_button = MOUSE_BUTTON_INDEX_LEFT end
 
 	if button == pressed_button then
-	
+
 		local name = control.data.name
 		if MailR.guildies[name]["recipient"] then
 			MailR.guildies[name]["recipient"] = false
@@ -1069,7 +1164,7 @@ function MailR.Guild_MouseUp(control, button, upInside)
 			MailR.guildies[name]["recipient"] = true
 		end
 		MailR.GuildControl:RefreshVisible()
-		
+
 	end
 	--MailR.Guild:MouseEnter(control, button, upInside)
 end
@@ -1089,7 +1184,7 @@ function MailRGuild:New()
 	--self.sortHeaderGroup:SelectHeaderByKey("timeStamp")
 
 	ZO_ScrollList_AddDataType(guildies.list, 1, "GuildiesRow", 30, function(control, data) self:SetupGuildiesRow(control, data) end, nil, nil)
-	
+
 	ZO_ScrollList_EnableHighlight(guildies.list, "ZO_ThinListHighlight")
 	guildies.sortFunction = function(listEntry1, listEntry2) return ZO_TableOrderingFunction(listEntry1.data, listEntry2.data, guildies.currentSortKey, MailR.SORT_KEYS, guildies.currentSortOrder) end
 
@@ -1361,9 +1456,9 @@ function MailR.IsMailDeletable(self)
 	if MailR.IsMailIdSentMail(self.mailId) then
 		return true
 	end
-	local mailData = self:GetMailData(self.mailId)
 
 	-- original
+	local mailData = self:GetMailData(self.mailId)
 	if(mailData) then
 		return mailData.attachedMoney == 0 and mailData.numAttachments == 0
 	end
@@ -1475,6 +1570,7 @@ end
 
 function MailR.IsMailIdSentMail(mailId)
 	if type(mailId) ~= "string" then return false end
+    -- local uniqueMailID = Id64ToString(mailId)
 	if mailId == nil or MailR.SavedMail.sent_messages[mailId] == nil then return false end
 	return true
 end
@@ -1587,6 +1683,7 @@ function MailR.OnMailReadable(self, mailId)
 	self:RefreshAttachmentsHeaderShown()
 	self:RefreshAttachmentSlots()
 end
+
 
 MailR.MAX_READ_ATTACHMENTS = MailR.MAX_ATTACHMENTS+1
 function MailR.RefreshAttachmentSlots(self)
@@ -1756,11 +1853,23 @@ function MailR.BuildMasterList(self)
 	GetControl(self.control, "Full"):SetHidden(not IsLocalMailboxFull())
 end
 
-function MailR.FilterDisplay(display)
+function MailR.FilterDisplay(allArgs)
 	-- /mailr inbox
 	-- /mailr sent
 	-- /mailr all
-	if not display or display == "help" or display == ""  or display == "?" then 
+  local args        = ""
+  local var2 = 0
+  local var3   = 0
+  local argNum      = 0
+  for w in string.gmatch(allArgs, "%w+") do
+    argNum = argNum + 1
+    if argNum == 1 then args = w end
+    if argNum == 2 then var2 = tonumber(w) end
+    if argNum == 3 then var3 = tonumber(w) end
+  end
+  args = string.lower(args)
+
+	if not args or args == "help" or args == ""  or args == "?" then
 		d(colorRavalox.."[MailR]"..colorYellow.." Accepted Commands:")
 		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailr"..colorSoftYellow.." << shows help")
 		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailr help"..colorSoftYellow.." << shows help")
@@ -1768,17 +1877,16 @@ function MailR.FilterDisplay(display)
 		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailer"..colorSoftYellow.." << shows MailR settings menu")
 		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailr inbox"..colorSoftYellow.." << shows only saved messages")
 		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailr sent"..colorSoftYellow.." << shows only sent messages")
-		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailr all"..colorSoftYellow.." << shows all messages")		
+		d(colorRavalox.."[MailR]"..colorCMDBlue.." /mailr all"..colorSoftYellow.." << shows all messages")
 	end
-	if display == "settings" then
-		local LAM2 = LibStub("LibAddonMenu-2.0")
-		LAM2:OpenToPanel(MAILR.addonPanel)
+	if args == "settings" then
+		LAM2:OpenToPanel(MailR.addonPanel)
 	end
-	if display == "inbox" then
+	if args == "inbox" then
 		MailR.SavedMail.display = "inbox"
-	elseif display == "sent" then
+	elseif args == "sent" then
 		MailR.SavedMail.display = "sent"
-	elseif display == "all" then
+	elseif args == "all" then
 		MailR.SavedMail.display = "all"
 	else
 		d("Unrecognized mailr option. Use inbox, sent, or all.")
@@ -1804,8 +1912,8 @@ function MailR.ConvertSavedMail()
 end
 
 function MailR.Donate()
-	SCENE_MANAGER:Show('mailSend') 
-	ZO_MailSendToField:SetText("@TheLab")
+	SCENE_MANAGER:Show('mailSend')
+	ZO_MailSendToField:SetText("@Sharlikran")
 	ZO_MailSendSubjectField:SetText("Donation From "..GetDisplayName())
 end
 
@@ -1877,7 +1985,6 @@ function MailR.Init(eventCode, addOnName)
 	--MailR.GuildSendProgress = ZO_TimerBar:New(SendProgress)
 	MailR.GuildThrottleTimer = ZO_TimerBar:New(ThrottleTimer)
 
-	local LAM = LibStub("LibAddonMenu-2.0")
 	local panelData = {
 		type = "panel",
 		name = "MailR",
@@ -1888,7 +1995,7 @@ function MailR.Init(eventCode, addOnName)
 		registerForRefresh = true,
 		--registerForDefaults = true,
 	}
-	LAM:RegisterAddonPanel("MailR_Panel", panelData)
+	LAM2:RegisterAddonPanel("MailR_Panel", panelData)
 	local optionsData = {
 		 [1] = {
 			  type = "checkbox",
@@ -1898,14 +2005,14 @@ function MailR.Init(eventCode, addOnName)
 			  setFunc = function(value) MailR.SavedMail.guildMailVisible = value end,
 		 },
 		 [2] = {
-		 	type = "slider", 
+		 	type = "slider",
             name = "Guild Mail Throttle",
             tooltip = "Time between sending messages to guildies",
-            min = 1, 
-            max = 10, 
-            step = 1, 
-            getFunc = function() return MailR.SavedMail.throttle_time end, 
-            setFunc = function(value) MailR.SavedMail.throttle_time = value end, 
+            min = 1,
+            max = 10,
+            step = 1,
+            getFunc = function() return MailR.SavedMail.throttle_time end,
+            setFunc = function(value) MailR.SavedMail.throttle_time = value end,
             default = 1,
          },
 		 [3] = {
@@ -1916,7 +2023,7 @@ function MailR.Init(eventCode, addOnName)
 			  setFunc = function(value) MailR.SavedMail.show_donation = value end,
 		 },
 	}
-	LAM:RegisterOptionControls("MailR_Panel", optionsData)
+	LAM2:RegisterOptionControls("MailR_Panel", optionsData)
 end
 
 EVENT_MANAGER:RegisterForEvent("MailR_Init", EVENT_ADD_ON_LOADED , MailR.Init)
