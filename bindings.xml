@@ -7,7 +7,7 @@
       <Action name="MAIL_FORWARD">
         <Down>MailR.CreateForward()</Down>
       </Action>
-      <Action name="MAIL_GUILD">
+      <Action name="MAIL_SAVE">
         <Down>MailR.MailGuild()</Down>
       </Action>
     </Category>
