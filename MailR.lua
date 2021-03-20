@@ -2082,7 +2082,7 @@ function MailR.Init(eventCode, addOnName)
   local panelData          = {
     type               = "panel",
     name               = "MailR",
-    displayName        = "|cFFFFFF MailR",
+    displayName        = "|cff6633MailR|r",
     author             = "Sharlikran, Pills, Ravalox Darkshire, Calia1120",
     version            = "2.5.03", --self.codeVersion,
     slashCommand       = "/mailer",
