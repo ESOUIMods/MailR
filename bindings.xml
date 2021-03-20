@@ -8,7 +8,7 @@
         <Down>MailR.CreateForward()</Down>
       </Action>
       <Action name="MAIL_SAVE">
-        <Down>MailR.MailGuild()</Down>
+        <Down>MailR.SaveMail()</Down>
       </Action>
     </Category>
   </Layer>
