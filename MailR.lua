@@ -322,17 +322,30 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   for a = 1, MailR.MAX_ATTACHMENTS do
     table.insert(MailR.currentMessageInfo["attachments"], {})
   end
-  -- we dont do anything with this information yet
+  --[[ we dont do anything with this information yet
   if not MailR.IsMailIdSentMail(mailId) then
-    for a = 1, numAttachments do
-      local textureName, stack, creatorName                  = GetAttachedItemInfo(mailId, a)
-      local link                                             = GetAttachedItemLink(mailId, a, LINK_STYLE_DEFAULT)
-      MailR.currentMessageInfo["attachments"][a].textureName = textureName
-      MailR.currentMessageInfo["attachments"][a].stack       = stack
-      MailR.currentMessageInfo["attachments"][a].creatorName = creatorName
-      MailR.currentMessageInfo["attachments"][a].link        = link
-    end
+
+  TODO: Make sure the attachments are saved with the mail
+  because previously it was checked whether or not it was
+  sent mail
+  ]]--
+  for a = 1, numAttachments do
+    local textureName, stack, creatorName                  = GetAttachedItemInfo(mailId, a)
+    local link                                             = GetAttachedItemLink(mailId, a, LINK_STYLE_DEFAULT)
+    local icon                                             = GetItemLinkInfo(link)
+    MailR.currentMessageInfo["attachments"][a].textureName = textureName
+    MailR.currentMessageInfo["attachments"][a].stack       = stack
+    MailR.currentMessageInfo["attachments"][a].creatorName = creatorName
+    MailR.currentMessageInfo["attachments"][a].link        = link
+    MailR.currentMessageInfo["attachments"][a].icon        = icon
   end
+  --[[
+  end
+
+  TODO: Make sure the attachments are saved with the mail
+  because previously it was checked whether or not it was
+  sent mail
+  ]]--
   -- shoud we include the body of the original message? Is there a message limit?
 
   -- this doesnt seem to return what I expect so use whats below
@@ -2071,7 +2084,7 @@ function MailR.Init(eventCode, addOnName)
     name               = "MailR",
     displayName        = "|cFFFFFF MailR",
     author             = "Sharlikran, Pills, Ravalox Darkshire, Calia1120",
-    version            = "2.5.02", --self.codeVersion,
+    version            = "2.5.03", --self.codeVersion,
     slashCommand       = "/mailer",
     registerForRefresh = true,
     --registerForDefaults = true,
