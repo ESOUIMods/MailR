@@ -1,8 +1,9 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.4.0.0
-Date: 2018-05-17 Calia1120
+Version: 2.5.03
+Original Author: pills
+Previous Authors: calia1120, Ravalox Darkshire
 ]]
 
 local LAM2                           = LibAddonMenu2
@@ -2081,9 +2082,9 @@ function MailR.Init(eventCode, addOnName)
 
   local panelData          = {
     type               = "panel",
-    name               = "MailR",
-    displayName        = "|cff6633MailR|r",
-    author             = "Sharlikran, Pills, Ravalox Darkshire, Calia1120",
+    name               = "MailR - Revised",
+    displayName        = "|c0a84ffMailR|r - |cc3366fRevised|r",
+    author             = "|c0a84ffSharlikran|r, Pills, Ravalox Darkshire, Calia1120",
     version            = "2.5.03", --self.codeVersion,
     slashCommand       = "/mailer",
     registerForRefresh = true,
