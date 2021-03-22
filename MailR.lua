@@ -1,7 +1,7 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.03
+Version: 2.5.04
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
@@ -252,7 +252,9 @@ function MailR.CreateReply()
 
   MailR.dm("Debug", "Creating Reply")
 
-  ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
+  ZO_MenuBar_SelectDescriptor(ZO_MainMenuSceneGroupBar, "mailSend", nil, nil)
+
+  -- ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
   ZO_MailSendToField:SetText(MailR.currentMessageInfo["displayName"])
   local reStr       = MailR.localeStringMap[lang]["Re: "]
   local replyString = MailR.currentMessageInfo["subject"]:gsub("^" .. reStr, "")
@@ -750,17 +752,18 @@ end
 
 -- copy message_table to a new table
 function MailR.CopyMessage(messageToCopy)
-  local copyMessage          = {}
-  copyMessage["recipient"]   = messageToCopy["recipient"]
-  copyMessage["subject"]     = messageToCopy["subject"]
-  copyMessage["body"]        = messageToCopy["body"]
-  copyMessage["gold"]        = messageToCopy["gold"]
-  copyMessage["cod"]         = messageToCopy["cod"]
-  copyMessage["postage"]     = messageToCopy["postage"]
-  copyMessage["timeSent"]    = messageToCopy["timeSent"]
-  copyMessage["isSentMail"]  = messageToCopy["isSentMail"]
-  copyMessage["returnable"]  = messageToCopy["returnable"]
-  copyMessage["attachments"] = {}
+  local copyMessage             = {}
+  copyMessage["recipient"]      = messageToCopy["recipient"]
+  copyMessage["subject"]        = messageToCopy["subject"]
+  copyMessage["body"]           = messageToCopy["body"]
+  copyMessage["gold"]           = messageToCopy["gold"]
+  copyMessage["cod"]            = messageToCopy["cod"]
+  copyMessage["postage"]        = messageToCopy["postage"]
+  copyMessage["timeSent"]       = messageToCopy["timeSent"]
+  copyMessage["isSentMail"]     = messageToCopy["isSentMail"]
+  copyMessage["isReceivedMail"] = messageToCopy["isReceivedMail"]
+  copyMessage["returnable"]     = messageToCopy["returnable"]
+  copyMessage["attachments"]    = {}
   for a = 1, MailR.MAX_ATTACHMENTS do
     table.insert(copyMessage["attachments"], messageToCopy["attachments"][a])
   end
@@ -953,6 +956,7 @@ function MailR.SaveMail()
   mail.isReceivedMail                        = true
   MailR.SavedMail.sent_messages[savedMailId] = MailR.CopyMessage(MailR.currentMessageInfo)
   MailR.SavedMail.sent_count                 = MailR.SavedMail.sent_count + 1
+  KEYBIND_STRIP:UpdateKeybindButtonGroup(MAIL_INBOX.selectionKeybindStripDescriptor)
   MAIL_INBOX:RefreshData()
 end
 
@@ -2085,7 +2089,10 @@ function MailR.Init(eventCode, addOnName)
     name               = "MailR - Revised",
     displayName        = "|c0a84ffMailR|r - |cc3366fRevised|r",
     author             = "|c0a84ffSharlikran|r, Pills, Ravalox Darkshire, Calia1120",
-    version            = "2.5.03", --self.codeVersion,
+    version            = "2.5.04", --self.codeVersion,
+    website            = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
+    feedback           = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
+    donation           = "https://sharlikran.github.io/",
     slashCommand       = "/mailer",
     registerForRefresh = true,
     --registerForDefaults = true,
