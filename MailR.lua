@@ -9,6 +9,38 @@ Previous Authors: calia1120, Ravalox Darkshire
 local LAM2                           = LibAddonMenu2
 -- GLOBALS
 MailR                                = {}
+-------------------------------------------------
+----- early helper                          -----
+-------------------------------------------------
+
+local function is_in(search_value, search_table)
+    for k, v in pairs(search_table) do
+        if search_value == v then return true end
+        if type(search_value) == "string" then
+            if string.find(string.lower(v), string.lower(search_value)) then return true end
+        end
+    end
+    return false
+end
+
+-------------------------------------------------
+----- lang setup                            -----
+-------------------------------------------------
+
+MailR.client_lang = GetCVar("language.2")
+MailR.effective_lang = nil
+MailR.supported_lang = { "de", "en", "fr", }
+if is_in(MailR.client_lang, MailR.supported_lang) then
+  MailR.effective_lang = MailR.client_lang
+else
+  MailR.effective_lang = "en"
+end
+MailR.supported_lang = MailR.client_lang == MailR.effective_lang
+
+-------------------------------------------------
+----- mod                                   -----
+-------------------------------------------------
+
 MailR.Name                           = "MailR"
 -- Set to true if you want to see debug output to console/chat window
 MailR.DEBUG                          = false
@@ -76,9 +108,8 @@ MailR.SavedMail_defaults             = {
 -- saved mail
 MailR.SavedMail                      = nil
 -- Locale vars --
--- translation map from EN -> (DE, FR)
 MailR.localeStringMap                = {
-  ["EN"] = {
+  ["en"] = {
     ["Reply"]            = "Reply",
     ["Forward"]          = "Forward",
     ["Reply To Message"] = "Reply To Message",
@@ -96,7 +127,7 @@ MailR.localeStringMap                = {
     ["COD: "]            = "COD: ",
     ["Postage: "]        = "Postage: "
   },
-  ["DE"] = {
+  ["de"] = {
     ["Reply"]            = "Antworten",
     ["Forward"]          = "Vorwärts",
     ["Reply To Message"] = "Antwort auf Beitrag",
@@ -114,7 +145,7 @@ MailR.localeStringMap                = {
     ["COD: "]            = "COD: ",
     ["Postage: "]        = "Porto: "
   },
-  ["FR"] = {
+  ["fr"] = {
     ["Reply"]              = "Répondre",
     ["Forward"]            = "Transférer",
     ["Reply To Message"]   = "Répondre au Message",
@@ -132,31 +163,12 @@ MailR.localeStringMap                = {
     ["COD: "]              = "COD: ",
     ["Postage: "]          = "Affranchissement: "
   },
-  ["RU"] = {
-    ["Reply"]            = "Reply",
-    ["Forward"]          = "Forward",
-    ["Reply To Message"] = "Reply To Message",
-    ["Forward Message"]  = "Forward Message",
-    ["Original Message"] = "Original Message",
-    ["Save Mail"]        = "Save Mail",
-    ["From: "]           = "From: ",
-    ["Fwd: "]            = "Fwd: ",
-    ["Re: "]             = "Re: ",
-    ["Attachments: "]    = "Attachments: ",
-    ["To:"]              = "To:",
-    ["Received:"]        = "Received:",
-    ["Sent:"]            = "Sent:",
-    ["Attached Gold: "]  = "Attached Gold: ",
-    ["COD: "]            = "COD: ",
-    ["Postage: "]        = "Postage: "
-  },
 }
 local colorYellow                    = "|cFFFF00"  -- yellow
 local colorSoftYellow                = "|cCCCC00"    -- Duller Yellow for Description
 local colorRed                       = "|cFF0000"  -- Red
 local colorRavalox                   = "|cB60000"    -- Ravalox Red  -- B6 = Red 182  a brighter 82 red
 local colorCMDBlue                   = "|c1155bb"    -- Dull blue used to indicate "typable" text
-local lang
 local ShowPlayerContextMenu_Orig     = CHAT_SYSTEM.ShowPlayerContextMenu
 local GetNextMailId_Orig             = GetNextMailId
 local ShowPlayerInteractMenu_Orig    = ZO_PlayerToPlayer.ShowPlayerInteractMenu
@@ -256,7 +268,7 @@ function MailR.CreateReply()
 
   -- ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
   ZO_MailSendToField:SetText(MailR.currentMessageInfo["displayName"])
-  local reStr       = MailR.localeStringMap[lang]["Re: "]
+  local reStr       = MailR.localeStringMap[MailR.effective_lang]["Re: "]
   local replyString = MailR.currentMessageInfo["subject"]:gsub("^" .. reStr, "")
   ZO_MailSendSubjectField:SetText(reStr .. replyString)
   ZO_MailSendBodyField:TakeFocus()
@@ -275,18 +287,18 @@ function MailR.CreateForward()
   MailR.dm("Debug", "Creating Forward")
 
   ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
-  local fwdStr      = MailR.localeStringMap[lang]["Fwd: "]
+  local fwdStr      = MailR.localeStringMap[MailR.effective_lang]["Fwd: "]
   local replyString = MailR.currentMessageInfo["subject"]:gsub("^" .. fwdStr, "")
   ZO_MailSendSubjectField:SetText(fwdStr .. replyString)
-  local origStr   = MailR.localeStringMap[lang]["Original Message"]
+  local origStr   = MailR.localeStringMap[MailR.effective_lang]["Original Message"]
   local bodyStr   = "\n***" .. MailR.DEFAULT_HEADER_COLOR_STRING .. origStr .. MailR.RESET_COLOR_STRING .. "***\n"
   local senderStr = MailR.currentMessageInfo["displayName"]
   if not MailR.currentMessageInfo["characterName"] == "" and not MailR.currentMessageInfo["characterName"] == nil then
     senderStr = MailR.currentMessageInfo["characterName"] .. "(" .. senderStr .. ")"
   end
-  bodyStr = bodyStr .. MailR.DEFAULT_HEADER_COLOR_STRING .. MailR.localeStringMap[lang]["From: "] .. MailR.RESET_COLOR_STRING .. senderStr .. "\n"
+  bodyStr = bodyStr .. MailR.DEFAULT_HEADER_COLOR_STRING .. MailR.localeStringMap[MailR.effective_lang]["From: "] .. MailR.RESET_COLOR_STRING .. senderStr .. "\n"
   bodyStr = bodyStr .. "\n" .. MailR.currentMessageInfo["body"] .. "\n"
-  bodyStr = bodyStr .. "***" .. MailR.DEFAULT_HEADER_COLOR_STRING .. "/" .. MailR.localeStringMap[lang]["Original Message"] .. MailR.RESET_COLOR_STRING .. "***\n"
+  bodyStr = bodyStr .. "***" .. MailR.DEFAULT_HEADER_COLOR_STRING .. "/" .. MailR.localeStringMap[MailR.effective_lang]["Original Message"] .. MailR.RESET_COLOR_STRING .. "***\n"
   ZO_MailSendBodyField:SetText(bodyStr)
   ZO_MailSendBodyField:TakeFocus()
 
@@ -722,7 +734,7 @@ function MailR.MailSentSuccessfully()
     MailR.queuedSentMessage["subject"] = "(No Subject)"
   end
   MailR.queuedSentMessage["isSentMail"] = true
-  MailR.dm("Debug", MailR.queuedSentMessage)
+  -- MailR.dm("Debug", MailR.queuedSentMessage)
   local mailId = MailR.GenerateMailId()
   while MailR.SavedMail.sent_messages["MailR_" .. tostring(mailId)] ~= nil do
     mailId = MailR.GenerateMailId()
@@ -990,8 +1002,6 @@ end
 
 function MailR.MailIdEquality(...)
   MailR.dm("Debug", "MailIdEquality")
-  MailR.dm("Debug", self)
-  MailR.dm("Debug", ...)
   -- return MailR.CheckMailIdEquality(data1.mailId, data2.mailId)
   return true
 end
@@ -1096,7 +1106,7 @@ end
 function MailR.OverloadMailSend()
   local initKB                           = MAIL_SEND.InitializeKeybindDescriptors
   local guildKB                          = {
-    name     = MailR.localeStringMap[lang]["Save Mail"],
+    name     = MailR.localeStringMap[MailR.effective_lang]["Save Mail"],
     keybind  = "MAIL_GUILD",
 
     callback = function()
@@ -1432,7 +1442,7 @@ function MailR.InitializeKeybindDescriptors(self)
 
     --Forward Mail
     {
-      name     = MailR.localeStringMap[lang]["Forward"],
+      name     = MailR.localeStringMap[MailR.effective_lang]["Forward"],
       keybind  = "MAIL_FORWARD", --MailR.GetPrimaryKeybindInfo(GetString(SI_KEYBINDINGS_LAYER_GENERAL), "MailR", "MAIL_FORWARD")[2],
 
       visible  = function()
@@ -1453,7 +1463,7 @@ function MailR.InitializeKeybindDescriptors(self)
 
     --Reply Mail
     {
-      name     = MailR.localeStringMap[lang]["Reply"],
+      name     = MailR.localeStringMap[MailR.effective_lang]["Reply"],
       keybind  = "MAIL_REPLY",
 
       visible  = function()
@@ -1482,7 +1492,7 @@ function MailR.InitializeKeybindDescriptors(self)
 
     --Save Mail
     {
-      name     = MailR.localeStringMap[lang]["Save Mail"],
+      name     = MailR.localeStringMap[MailR.effective_lang]["Save Mail"],
       keybind  = "MAIL_SAVE", --MailR.GetPrimaryKeybindInfo(GetString(SI_KEYBINDINGS_LAYER_GENERAL), "MailR", "MAIL_FORWARD")[2],
 
       visible  = function()
@@ -1519,7 +1529,6 @@ end
 
 function MailR.Delete(self)
   MailR.dm("Debug", "MailR.Delete")
-  MailR.dm("Debug", self.mailId)
   if MailR.IsMailIdSentMail(self.mailId) then
     self:ConfirmDelete()
     return
@@ -1680,10 +1689,10 @@ end
 
 function MailR.GenerateBodyMessageForViewing(message)
   local originalBody    = message.body .. "\n\n"
-  local attachedGoldStr = MailR.localeStringMap[lang]["Attached Gold: "]
-  local codStr          = MailR.localeStringMap[lang]["COD: "]
-  local postageStr      = MailR.localeStringMap[lang]["Postage: "]
-  local attachmentStr   = MailR.localeStringMap[lang]["Attachments: "]
+  local attachedGoldStr = MailR.localeStringMap[MailR.effective_lang]["Attached Gold: "]
+  local codStr          = MailR.localeStringMap[MailR.effective_lang]["COD: "]
+  local postageStr      = MailR.localeStringMap[MailR.effective_lang]["Postage: "]
+  local attachmentStr   = MailR.localeStringMap[MailR.effective_lang]["Attachments: "]
   local goldString      = MailR.DEFAULT_HEADER_COLOR_STRING .. attachedGoldStr .. MailR.RESET_COLOR_STRING .. tostring(message.gold) .. "\n"
   local codString
   if message.cod then
@@ -1754,8 +1763,8 @@ function MailR.OnMailReadable(self, mailId)
   local fromLabel = GetControl(self.messageControl, "From")
   fromLabel:SetText(mailData.senderDisplayName)
   if sentMail == true then
-    GetControl(self.messageControl, "FromLabel"):SetText(MailR.localeStringMap[lang]["To:"])
-    GetControl(self.messageControl, "ReceivedLabel"):SetText(MailR.localeStringMap[lang]["Sent:"])
+    GetControl(self.messageControl, "FromLabel"):SetText(MailR.localeStringMap[MailR.effective_lang]["To:"])
+    GetControl(self.messageControl, "ReceivedLabel"):SetText(MailR.localeStringMap[MailR.effective_lang]["Sent:"])
   else
     GetControl(self.messageControl, "FromLabel"):SetText(GetString(SI_MAIL_READ_FROM_LABEL))
     GetControl(self.messageControl, "ReceivedLabel"):SetText(GetString(SI_MAIL_READ_RECEIVED_LABEL))
@@ -2054,10 +2063,9 @@ function MailR.Init(eventCode, addOnName)
   end
   math.randomseed(GetTimeStamp())
 
-  lang                    = GetCVar("Language.2"):upper()
-  local replySettingStr   = MailR.localeStringMap[lang]["Reply To Message"]
-  local forwardSettingStr = MailR.localeStringMap[lang]["Forward Message"]
-  local mailSaveStr       = MailR.localeStringMap[lang]["Save Mail"]
+  local replySettingStr   = MailR.localeStringMap[MailR.effective_lang]["Reply To Message"]
+  local forwardSettingStr = MailR.localeStringMap[MailR.effective_lang]["Forward Message"]
+  local mailSaveStr       = MailR.localeStringMap[MailR.effective_lang]["Save Mail"]
   ZO_CreateStringId("SI_BINDING_NAME_MAIL_REPLY", replySettingStr)
   ZO_CreateStringId("SI_BINDING_NAME_MAIL_FORWARD", forwardSettingStr)
   ZO_CreateStringId("SI_BINDING_NAME_MAIL_SAVE", mailSaveStr)
@@ -2089,7 +2097,7 @@ function MailR.Init(eventCode, addOnName)
     name               = "MailR - Revised",
     displayName        = "|c0a84ffMailR|r - |cc3366fRevised|r",
     author             = "|c0a84ffSharlikran|r, Pills, Ravalox Darkshire, Calia1120",
-    version            = "2.5.04", --self.codeVersion,
+    version            = "2.5.05", --self.codeVersion,
     website            = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
     feedback           = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
     donation           = "https://sharlikran.github.io/",
