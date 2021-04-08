@@ -173,6 +173,7 @@ local ShowPlayerContextMenu_Orig     = CHAT_SYSTEM.ShowPlayerContextMenu
 local GetNextMailId_Orig             = GetNextMailId
 local ShowPlayerInteractMenu_Orig    = ZO_PlayerToPlayer.ShowPlayerInteractMenu
 
+MailR.show_log           = false
 if LibDebugLogger then
   logger       = LibDebugLogger.Create(MailR.Name)
   MailR.logger = logger
@@ -224,6 +225,7 @@ end
 
 function MailR.dm(log_type, ...)
   if not MailR.logger then return end
+  if not MailR.show_log then return end
   for i = 1, select("#", ...) do
     local value = select(i, ...)
     if (type(value) == "table") then
