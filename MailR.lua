@@ -27,7 +27,7 @@ end
 ----- lang setup                            -----
 -------------------------------------------------
 
-MailR.client_lang = GetCVar("language.2")
+MailR.client_lang = GetCVar("Language.2")
 MailR.effective_lang = nil
 MailR.supported_lang = { "de", "en", "fr", }
 if is_in(MailR.client_lang, MailR.supported_lang) then
