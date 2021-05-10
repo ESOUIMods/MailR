@@ -29,7 +29,7 @@ end
 
 MailR.client_lang = GetCVar("Language.2")
 MailR.effective_lang = nil
-MailR.supported_lang = { "de", "en", "fr", }
+MailR.supported_lang = { "de", "en", "fr", "es", }
 if is_in(MailR.client_lang, MailR.supported_lang) then
   MailR.effective_lang = MailR.client_lang
 else
@@ -162,6 +162,24 @@ MailR.localeStringMap                = {
     ["Attached Gold: "]    = "Or Attaché: ",
     ["COD: "]              = "COD: ",
     ["Postage: "]          = "Affranchissement: "
+  },
+  ["es"] = {
+    ["Reply"] = "Responder",
+    ["Forward"] = "Reenviar",
+    ["Reply To Message"] = "Responder mensaje",
+    ["Forward Message"] = "Reenviar mensaje",
+    ["Original Message"] = "Mensaje original",
+    ["Save Mail"] = "Guardar correo",
+    ["From: "] = "De: ",
+    ["Fwd: "] = "RV: ",
+    ["Re: "] = "RE: ",
+    ["Attachments: "] = "Adjuntos: ",
+    ["To:"] = "Para:",
+    ["Received:"] = "Recibido:",
+    ["Sent:"] = "Enviar:",
+    ["Attached Gold: "] = "Oro adjunto: ",
+    ["COD: "] = "Contra reembolso: ",
+    ["Postage: "] = "Gastos de envío: ",
   },
 }
 local colorYellow                    = "|cFFFF00"  -- yellow
