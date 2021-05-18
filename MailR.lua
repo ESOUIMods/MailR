@@ -402,6 +402,7 @@ function MailR.SetMailboxActive(eventCode)
   -- visibilty of our buttons on the KeybindStrip control
   -- only reset the handlers once! Also they dont exist until mailbox is opened for the first time
   -- probably not needed anymore
+  --[[
   if MailR.setHandlersOnFirstLoad then
     -- need to do this because objects not created if mailsend is first menu loaded
     -- this can happen if someone right clicks chat to send message before opening mailbox first
@@ -412,6 +413,7 @@ function MailR.SetMailboxActive(eventCode)
       handlerFunc(...)
     end)
   end
+  ]]--
   if MailR.SavedMail.show_donation then
     if MasterMerchantMailButton ~= nil then
       MailR.DonateButton:SetAnchor(TOPLEFT, MasterMerchantMailButton, BOTTOMLEFT, 0, 4)
