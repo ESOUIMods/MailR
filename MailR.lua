@@ -395,7 +395,7 @@ end
 
 -- Mail UI opened
 function MailR.SetMailboxActive(eventCode)
-  MailR.dm("Debug", "Mailbox Active")
+  MailR.dm("Debug", "SetMailboxActive")
   MailR.mailboxActive = true
   if SCENE_MANAGER.currentScene.name == 'mailSend' then return end
   -- overload the event handler for mailbox buttons so we can maintain proper
@@ -428,7 +428,7 @@ end
 
 -- Mail UI closed
 function MailR.SetMailboxInactive(eventCode)
-  MailR.dm("Debug", "Mailbox Inactive")
+  MailR.dm("Debug", "SetMailboxInactive")
   MailR.mailboxActive = false
   MailR.HideGuildies()
   local k, v = next(MailR.GuildRecipients)
@@ -719,18 +719,21 @@ function MailR.UpdateKeybindInfo(eventCode)
 end
 
 -- called when text in recipient field of composed message is updated
+--TODO Keep: Examine why this is needed
 function MailR.UpdateSendTo()
   MailR.dm("Verbose", "recipient updated")
   MailR.currentSendMessageInfo["recipient"] = ZO_MailSendToField:GetText()
 end
 
 -- called when text in subject field of composed message is updated
+--TODO Keep: Examine why this is needed
 function MailR.UpdateSendSubject()
   MailR.dm("Verbose", "subject updated")
   MailR.currentSendMessageInfo["subject"] = ZO_MailSendSubjectField:GetText()
 end
 
 -- called when text in body field of composed message is updated
+--TODO Keep: Examine why this is needed
 function MailR.UpdateSendBody()
   MailR.dm("Verbose", "body updated")
   MailR.currentSendMessageInfo["body"] = ZO_MailSendBodyField:GetText()
@@ -747,8 +750,8 @@ function MailR.rtrim(s)
   return s:sub(1, n)
 end
 
-function MailR.MailSentSuccessfully()
-  MailR.dm("Debug", "mail sent")
+function MailR.MailSentSuccessfully(eventCode, playerName)
+  MailR.dm("Debug", "MailSentSuccessfully")
   if next(MailR.queuedSentMessage) == nil then return end
   if next(MailR.GuildRecipients) ~= nil then return end
   MailR.queuedSentMessage["timeSent"] = GetTimeStamp()
@@ -806,7 +809,7 @@ end
 
 -- called when attachments are added to composed mail
 function MailR.AttachmentAdded(eventCode, slot)
-  MailR.dm("Debug", "attachment")
+  MailR.dm("Debug", "AttachmentAdded")
   local attachment                                  = ZO_MailSendAttachments:GetChild(slot)
   local bagid                                       = attachment.bagId
   local slotid                                      = attachment.slotIndex
@@ -819,7 +822,7 @@ end
 
 -- called when attachments are removed from composed mail
 function MailR.AttachmentRemoved(eventCode, slot)
-  MailR.dm("Debug", "removing attachment")
+  MailR.dm("Debug", "AttachmentRemoved")
   MailR.currentSendMessageInfo["attachments"][slot] = {}
   MailR.currentSendMessageInfo["postage"]           = GetQueuedMailPostage()
 end
@@ -841,8 +844,8 @@ function MailR.CODChanged()
   MailR.currentSendMessageInfo["postage"] = GetQueuedMailPostage()
 end
 
-function MailR.GuildMailSent()
-  MailR.dm("Debug", "Guild Mail Sent")
+function MailR.GuildMailSent(eventCode, playerName)
+  MailR.dm("Debug", "GuildMailSent")
   MailR.WaitingForResponse = false
   local k, v               = next(MailR.GuildRecipients)
   if k == nil or MailR.CancelGuildMail then
@@ -877,7 +880,7 @@ function MailR.GuildMailFailSent()
 end
 
 function MailR.FinishedGuildMail()
-  MailR.dm("Debug", "Guild Mail Finished")
+  MailR.dm("Debug", "FinishedGuildMail")
   MAIL_SEND:ClearFields()
   QueueMoneyAttachment(0) -- just to make sure
   MailR.GuildThrottleTimer:Stop()
@@ -952,7 +955,7 @@ end
 
 -- when SendMail is called do this first, otherwise currentSendMessageInfo gets cleared (by ZOS)
 function MailR.QueueSentMessage()
-  MailR.dm("Debug", "queuing message")
+  MailR.dm("Debug", "QueueSentMessage")
   MailR.queuedSentMessage = {}
   MailR.queuedSentMessage = MailR.CopyMessage(MailR.currentSendMessageInfo)
   if MailR.guildies_visible then
@@ -1550,7 +1553,7 @@ function MailR.ConfirmDelete(self)
 end
 
 function MailR.Delete(self)
-  MailR.dm("Debug", "MailR.Delete")
+  MailR.dm("Debug", "Delete")
   if MailR.IsMailIdSentMail(self.mailId) then
     self:ConfirmDelete()
     return
