@@ -2,10 +2,9 @@
 ## APIVersion: 100035 101031
 ## Author: Sharlikran Ravalox Darkshire, Calia1120 & pills
 ## SavedVariables: SV_MailR_SavedMail
-## Version: 2.5.06
-## AddOnVersion: 2506
-## Description: MailR is an overhaul of ESO's Mail interface with additional functionality.
-## DependsOn: LibAddonMenu-2.0>=32
+## Version: 2.5.07
+## AddOnVersion: 2507
+## Description: MailR adds additional functionality to the Mail interface.
 ## OptionalDependsOn: LibDebugLogger>=196 DebugLogViewer
 
 MailR.lua
