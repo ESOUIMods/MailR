@@ -1,7 +1,7 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.07
+Version: 2.5.09
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
@@ -332,7 +332,7 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   fromSystem, fromCustomerService, returned, numAttachments, attachedMoney,
   codAmount, expiresInDays, secsSinceReceived = GetMailItemInfo(mailId)
 
-  --[[ TODO: Update the concept of isSentMail such that whne you send mail
+  --[[ TODO: Update the concept of isSentMail such that when you send mail
   it is auto saved and flagged as sent. Received Mail is flagged when saved.
   However, both types then indicate that it is a MailR mail and not player or
   system mail.
@@ -1919,8 +1919,8 @@ function MailR.Init(eventCode, addOnName)
   EVENT_MANAGER:RegisterForEvent("MailR_SetMailboxInactive", EVENT_MAIL_CLOSE_MAILBOX, MailR.SetMailboxInactive)
   EVENT_MANAGER:RegisterForEvent("MailR_UpdateKeybindInfo", EVENT_KEYBINDING_SET, MailR.UpdateKeybindInfo)
   EVENT_MANAGER:RegisterForEvent("MailR_MailSentSuccessfully", EVENT_MAIL_SEND_SUCCESS, MailR.MailSentSuccessfully)
-  EVENT_MANAGER:RegisterForEvent("MailR_GuildMailSentSuccessfully", EVENT_MAIL_SEND_SUCCESS, MailR.GuildMailSent)
-  EVENT_MANAGER:RegisterForEvent("MailR_GuildMailSentUnsuccessfully", EVENT_MAIL_SEND_FAILED, MailR.GuildMailFailSent)
+  -- EVENT_MANAGER:RegisterForEvent("MailR_GuildMailSentSuccessfully", EVENT_MAIL_SEND_SUCCESS, MailR.GuildMailSent)
+  -- EVENT_MANAGER:RegisterForEvent("MailR_GuildMailSentUnsuccessfully", EVENT_MAIL_SEND_FAILED, MailR.GuildMailFailSent)
   EVENT_MANAGER:RegisterForEvent("MailR_AttachmentAdded", EVENT_MAIL_ATTACHMENT_ADDED, MailR.AttachmentAdded)
   EVENT_MANAGER:RegisterForEvent("MailR_AttachmentRemoved", EVENT_MAIL_ATTACHMENT_REMOVED, MailR.AttachmentRemoved)
   EVENT_MANAGER:RegisterForEvent("MailR_CODChanged", EVENT_MAIL_COD_CHANGED, MailR.CODChanged)
