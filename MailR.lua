@@ -1,7 +1,7 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.09
+Version: 2.5.10
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
