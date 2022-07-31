@@ -1,7 +1,7 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.10
+Version: 2.5.11
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
@@ -1955,10 +1955,14 @@ function MailR.Init(eventCode, addOnName)
     MailR.UpdateSendTo()
   end)
   local originalSubjectHandler = ZO_MailSendSubjectField:GetHandler("OnTextChanged")
-  ZO_MailSendSubjectField:SetHandler("OnTextChanged", function(...)
-    originalSubjectHandler(...)
-    MailR.UpdateSendSubject()
-  end)
+  if originalSubjectHandler then
+    ZO_MailSendSubjectField:SetHandler("OnTextChanged", function(...)
+      originalSubjectHandler(...)
+      MailR.UpdateSendSubject()
+    end)
+  else
+    ZO_MailSendSubjectField:SetHandler("OnTextChanged", function(...) MailR.UpdateSendSubject() end)
+  end
   ZO_MailSendBodyField:SetHandler("OnTextChanged", function(...) MailR.UpdateSendBody() end)
 
   MailR.OverloadMailInbox()
