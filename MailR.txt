@@ -1,5 +1,5 @@
 ## Title: MailR - Revised
-## APIVersion: 101034 101035
+## APIVersion: 101035 101036
 ## Author: Sharlikran Ravalox Darkshire, Calia1120 & pills
 ## SavedVariables: SV_MailR_SavedMail
 ## Version: 2.5.11
