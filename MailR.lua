@@ -346,7 +346,7 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   MailR.currentMessageInfo["body"] = ZO_MailInboxMessageBody:GetText()
   MailR.currentMessageInfo["numAttachments"] = numAttachments
   MailR.currentMessageInfo["secsSinceReceived"] = secsSinceReceived
-  MailR.currentMessageInfo["timeSent"] = GetDiffBetweenTimeStamps(GetTimeStamp() - secsSinceReceived)
+  MailR.currentMessageInfo["timeSent"] = GetTimeStamp() - secsSinceReceived
   MailR.currentMessageInfo["attachments"] = {}
   MailR.currentMessageInfo["gold"] = 0
   MailR.currentMessageInfo["cod"] = false
