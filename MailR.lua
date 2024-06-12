@@ -1,11 +1,10 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.14
+Version: 2.5.16
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
-local LAM = LibAddonMenu2
 
 -- GLOBALS
 MailR = {}
@@ -44,7 +43,6 @@ MailR.supported_lang = MailR.client_lang == MailR.effective_lang
 
 MailR.Name = "MailR"
 -- Set to true if you want to see debug output to console/chat window
-MailR.DEBUG = false
 -- default mail color
 --MailR.DEFAULT_EXPIRE_MAIL_COLOR_STRING = "|c2dc50e"
 MailR.DEFAULT_SAVE_MAIL_COLOR_STRING = "|c2dc50e"
@@ -64,8 +62,6 @@ MailR.LastKnownRecipient = {}
 MailR.CurrentKnownGuild = {}
 MailR.LastKnownGuild = {}
 MailR.failed_guildies = {}
-MailRGuild = ZO_SortFilterList:Subclass()
-MailRGuild.defaults = {}
 MailR.GuildDropdown = nil
 MailR.GuildRankDropdown = nil
 MailR.GuildStatusDropdown = nil
@@ -95,7 +91,6 @@ MailR.SAVED_MAIL_VERSION = "2.0"
 -- default table for above version incase this the first time MailR is used
 MailR.SavedMail_defaults = {
   display = "all",
-  disableDeleteConfirmation = true,
   mailr_version = MailR.SAVED_MAIL_VERSION,
   sent_count = 0,
   sent_messages = {},
@@ -181,55 +176,14 @@ MailR.localeStringMap = {
     ["Postage: "] = "Gastos de envío: ",
   },
 }
-local colorYellow = "|cFFFF00"  -- yellow
-local colorSoftYellow = "|cCCCC00"    -- Duller Yellow for Description
-local colorRed = "|cFF0000"  -- Red
-local colorRavalox = "|cB60000"    -- Ravalox Red  -- B6 = Red 182  a brighter 82 red
-local colorCMDBlue = "|c1155bb"    -- Dull blue used to indicate "typable" text
 local ShowPlayerContextMenu_Orig = CHAT_SYSTEM.ShowPlayerContextMenu
-local GetNextMailId_Orig = GetNextMailId
 local ShowPlayerInteractMenu_Orig = ZO_PlayerToPlayer.ShowPlayerInteractMenu
-
--------------------------------------------------
------ settings                              -----
--------------------------------------------------
-
-local panelData = {
-  type = 'panel',
-  name = 'MailR',
-  displayName = "MailR",
-  author = "pills, Sharlikran",
-  version = "2.5.14",
-  website = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
-  registerForDefaults = true,
-}
-
-local optionsData = {}
-optionsData[#optionsData + 1] = {
-  type = "header",
-  name = "MailR",
-  width = "full",
-}
--- Open main window with mailbox scenes
-optionsData[#optionsData + 1] = {
-  type = 'checkbox',
-  name = "Disable Delete Confirmation",
-  tooltip = "Disable Delete Confirmation",
-  getFunc = function() return MailR.SavedMail.disableDeleteConfirmation end,
-  setFunc = function(value) MailR.SavedMail.disableDeleteConfirmation = value end,
-  default = MailR.SavedMail_defaults.disableDeleteConfirmation,
-}
-
-function MailR:InitLam()
-  LAM:RegisterAddonPanel('MailROptions', panelData)
-  LAM:RegisterOptionControls('MailROptions', optionsData)
-end
 
 -------------------------------------------------
 ----- logger                                -----
 -------------------------------------------------
 
-MailR.show_log = false
+MailR.show_log = true
 if LibDebugLogger then
   local logger = LibDebugLogger.Create(MailR.Name)
   MailR.logger = logger
@@ -299,39 +253,6 @@ end
 -- /GLOBALS
 
 
--- When Reply Button Clicked or Key Pressed
-function MailR.CreateReply()
-  -- make sure we only try to create/show a reply when the mailInbox is active
-  if not MailR.mailboxActive then return end
-  if SCENE_MANAGER.currentScene.name ~= "mailInbox" then return end
-
-  if MailR.IsMailIdSentMail(MAIL_INBOX.mailId) then
-    local sentMail = MailR.SavedMail.sent_messages[MAIL_INBOX.mailId]["isSentMail"]
-    if sentMail == nil or sentMail == true then
-      return
-    end
-    local isReturnable = MailR.SavedMail.sent_messages[MAIL_INBOX.mailId]["returnable"]
-    if isReturnable == nil or isReturnable == false then
-      return
-    end
-  else
-    if not MailR.currentMessageInfo.returnable then return end
-    local openMailId = MAIL_INBOX:GetOpenMailId()
-    if not MAIL_INBOX:GetMailData(openMailId) then return end
-  end
-
-  MailR.dm("Debug", "Creating Reply")
-
-  ZO_MenuBar_SelectDescriptor(ZO_MainMenuSceneGroupBar, "mailSend", nil, nil)
-
-  -- ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
-  ZO_MailSendToField:SetText(MailR.currentMessageInfo["displayName"])
-  local reStr = MailR.localeStringMap[MailR.effective_lang]["Re: "]
-  local replyString = MailR.currentMessageInfo["subject"]:gsub("^" .. reStr, "")
-  ZO_MailSendSubjectField:SetText(reStr .. replyString)
-  ZO_MailSendBodyField:TakeFocus()
-end
-
 -- When Forward Button Clicked or Key Pressed
 function MailR.CreateForward()
   -- make sure we only try to create/show a reply when the mailInbox is active
@@ -366,7 +287,7 @@ end
 
 -- Handles when a message in the inbox is selected
 function MailR.InboxMessageSelected(eventCode, mailId)
-  MailR.dm("Verbose", "InboxMessageSelected")
+  MailR.dm("Debug", "InboxMessageSelected")
   MailR.dm("Verbose", mailId)
   MailR.dm("Verbose", { GetMailItemInfo(idmailId) })
 
@@ -445,226 +366,10 @@ function MailR.SetMailboxInactive(eventCode)
   MailR.mailboxActive = false
 end
 
-function MailR.GuildMailCancel()
-  MailR.CancelGuildMail = true
-  SendProgressLabel:SetText("Canceling...")
-  SendProgressButton:SetEnabled(false)
-  --MailR.FinishedGuildMail()
-end
-
-function MailR.ShowGuildies()
-  Guildies:SetHidden(false)
-  MailR.guildies_visible = true
-  local numGuilds = GetNumGuilds()
-  for i = 1, numGuilds do
-    local guildId = GetGuildId(i)
-    local guildName = GetGuildName(guildId)
-    MailR.guilds[guildName] = guildId
-    local entry = MailR.GuildDropdown:CreateItemEntry(guildName,
-      MailR.GuildItemSelect)  --this really just creates a table with {name = choices[i], callback = OnItemSelect} - you may be able to skip this step and just pass the correctly formatted table into the below function...
-    MailR.GuildDropdown:AddItem(entry)
-  end
-
-  local w, h = ZO_MailSend:GetDimensions()
-  Guildies:SetAnchor(TOPRIGHT, ZO_MailSend, TOPLEFT, -32, 0)
-  Guildies:SetDimensions(512, h + 32)
-  --Guildies:SetHidden(false)
-end
-
-function MailR.SendProgressChanged(control, value, eventReason)
-  --MailR.GuildSendProgress:SetLabel("Sending..."..tostring(value))
-end
-
-function MailR.ThrottleTimerChanged(control, value, eventReason)
-  --d(value, MailR.ThrottleTime)
-  if value > MailR.SavedMail.throttle_time then
-    MailR.GuildThrottleTimer:Stop()
-    if not MailR.WaitingForResponse then
-      local k, v = next(MailR.GuildRecipients)
-      if MailR.CancelGuildMail then
-        MailR.FinishedGuildMail()
-        return
-      end
-      if k ~= nil then MailR.SendGuildMailMessage(k) end
-    else
-      if MailR.CancelGuildMail then
-        MailR.FinishedGuildMail()
-        return
-      end
-      SendProgressLabel:SetText(SendProgressLabel:GetText() .. "...Waiting For ZOS")
-    end
-  end
-end
-
-function MailR.GuildItemSelect(_, guildName, choiceNumber)
-  MailR.dm("Debug", "GuildItemSelect")
-  MailR.dm("Debug", guildName)
-  MailR.dm("Debug", choiceNumber)
-  MailR.dm("Debug", MailR.guilds[guildName])
-  MailR.guildies = {}
-  MailR.guildRanks = {}
-  MailR.GuildRankDropdown:ClearItems()
-  MailR.GuildStatusDropdown:ClearItems()
-  MailR.GuildLogicDropdown:ClearItems()
-  MailR.CurrentKnownGuild = { guildName, choiceNumber }
-  local guildId = MailR.guilds[guildName]
-  local numGuildies = GetNumGuildMembers(guildId)
-  local entry
-  for i = 1, numGuildies do
-    local name, note, rankIndex, status, logoff = GetGuildMemberInfo(guildId, i)
-    local rankName = GetFinalGuildRankName(guildId, rankIndex)
-    local hasChar, charName, zoneName, classType, alliance, level, vr = GetGuildMemberCharacterInfo(guildId, i)
-    if status == PLAYER_STATUS_OFFLINE then status = false else status = true end
-    local data = { charName = charName:gsub("%^.*x$",
-      ""), rankName = rankName, status = status, recipient = true }
-    MailR.guildies[name] = data
-  end
-  local numGuildRanks = GetNumGuildRanks(guildId)
-  for i = 1, numGuildRanks do
-    local rankName = GetFinalGuildRankName(guildId, i)
-    MailR.guildranks[rankName] = i
-    entry = MailR.GuildRankDropdown:CreateItemEntry(rankName,
-      MailR.GuildRankItemSelect)  --this really just creates a table with {name = choices[i], callback = OnItemSelect} - you may be able to skip this step and just pass the correctly formatted table into the below function...
-    MailR.GuildRankDropdown:AddItem(entry)
-  end
-  entry = MailR.GuildRankDropdown:CreateItemEntry("All Members", MailR.GuildRankItemSelect)
-  MailR.GuildRankDropdown:AddItem(entry)
-  MailR.GuildRankDropdown:SetSelectedItem("All Members")
-
-  entry = MailR.GuildStatusDropdown:CreateItemEntry("All", MailR.GuildStatusItemSelect)
-  MailR.GuildStatusDropdown:AddItem(entry)
-  entry = MailR.GuildStatusDropdown:CreateItemEntry("Online", MailR.GuildStatusItemSelect)
-  MailR.GuildStatusDropdown:AddItem(entry)
-  entry = MailR.GuildStatusDropdown:CreateItemEntry("Offline", MailR.GuildStatusItemSelect)
-  MailR.GuildStatusDropdown:AddItem(entry)
-  MailR.GuildStatusDropdown:SetSelectedItem("All")
-
-  entry = MailR.GuildLogicDropdown:CreateItemEntry("==", MailR.GuildLogicItemSelect)
-  MailR.GuildLogicDropdown:AddItem(entry)
-  entry = MailR.GuildLogicDropdown:CreateItemEntry(">=", MailR.GuildLogicItemSelect)
-  MailR.GuildLogicDropdown:AddItem(entry)
-  entry = MailR.GuildLogicDropdown:CreateItemEntry("<=", MailR.GuildLogicItemSelect)
-  MailR.GuildLogicDropdown:AddItem(entry)
-  MailR.GuildLogicDropdown:SetSelectedItem("==")
-
-  MailR.GuildControl:Update()
-end
-
-function MailR.GuildRankItemSelect(_, rankName, choiceNumber)
-  MailR.dm("Debug", rankName)
-  MailR.dm("Debug", choiceNumber)
-  MailR.dm("Debug", MailR.guildranks[choiceNumber])
-  local statusText = MailR.GuildStatusDropdown:GetSelectedItem()
-  local status = true
-  if statusText == "Offline" then status = false end
-  local logicText = MailR.GuildLogicDropdown:GetSelectedItem()
-  for k, v in pairs(MailR.guildies) do
-    local recipient = true
-    if not (v["status"] == status or statusText == "All") then recipient = false end
-    if recipient then
-      local guildRank = MailR.guildranks[rankName]
-      if (v["rankName"] == rankName or rankName == "All Members") then
-        recipient = true
-      elseif logicText == ">=" then
-        local checkRank = MailR.guildranks[v["rankName"]]
-        if checkRank < guildRank then
-          recipient = true
-        else
-          recipient = false
-        end
-      elseif logicText == "<=" then
-        local checkRank = MailR.guildranks[v["rankName"]]
-        if checkRank > guildRank then
-          recipient = true
-        else
-          recipient = false
-        end
-      else
-        recipient = false
-      end
-    end
-    v["recipient"] = recipient
-  end
-  MailR.GuildControl:Update()
-end
-
-function MailR.GuildStatusItemSelect(_, statusText, choiceNumber)
-  MailR.dm("Debug", statusText)
-  MailR.dm("Debug", choiceNumber)
-  local rankName = MailR.GuildRankDropdown:GetSelectedItem()
-  local status = true
-  if statusText == "Offline" then status = false end
-  local logicText = MailR.GuildLogicDropdown:GetSelectedItem()
-  for k, v in pairs(MailR.guildies) do
-    local recipient = true
-    if not (v["status"] == status or statusText == "All") then recipient = false end
-    if recipient then
-      local guildRank = MailR.guildranks[rankName]
-      if (v["rankName"] == rankName or rankName == "All Members") then
-        recipient = true
-      elseif logicText == ">=" then
-        local checkRank = MailR.guildranks[v["rankName"]]
-        if checkRank < guildRank then
-          recipient = true
-        else
-          recipient = false
-        end
-      elseif logicText == "<=" then
-        local checkRank = MailR.guildranks[v["rankName"]]
-        if checkRank > guildRank then
-          recipient = true
-        else
-          recipient = false
-        end
-      else
-        recipient = false
-      end
-    end
-    v["recipient"] = recipient
-  end
-  MailR.GuildControl:Update()
-
-end
-
-function MailR.GuildLogicItemSelect(_, logicText, choiceNumber)
-  MailR.dm("Debug", logicText)
-  MailR.dm("Debug", choiceNumber)
-  local rankName = MailR.GuildRankDropdown:GetSelectedItem()
-  local statusText = MailR.GuildStatusDropdown:GetSelectedItem()
-  local status = true
-  if statusText == "Offline" then status = false end
-  for k, v in pairs(MailR.guildies) do
-    local recipient = true
-    if not (v["status"] == status or statusText == "All") then recipient = false end
-    if recipient then
-      local guildRank = MailR.guildranks[rankName]
-      if (v["rankName"] == rankName or rankName == "All Members") then
-        recipient = true
-      elseif logicText == ">=" then
-        local checkRank = MailR.guildranks[v["rankName"]]
-        if checkRank < guildRank then
-          recipient = true
-        else
-          recipient = false
-        end
-      elseif logicText == "<=" then
-        local checkRank = MailR.guildranks[v["rankName"]]
-        if checkRank > guildRank then
-          recipient = true
-        else
-          recipient = false
-        end
-      else
-        recipient = false
-      end
-    end
-    v["recipient"] = recipient
-  end
-  MailR.GuildControl:Update()
-end
 
 -- Get Keybind Layer Index by Layer Name
 function MailR.GetKeybindLayerIndex(layerName)
+  MailR.dm("Debug", "GetKeybindLayerIndex")
   local layers = GetNumActionLayers()
   for layer = 1, layers do
     if GetActionLayerInfo(layer) == layerName then return layer end
@@ -675,6 +380,7 @@ end
 
 -- Get keybind category index by name
 function MailR.GetKeybindCategoryIndex(layerIndex, categoryName)
+  MailR.dm("Debug", "GetKeybindCategoryIndex")
   local layerName, numCategories = GetActionLayerInfo(layerIndex)
   for category = 1, numCategories do
     if GetActionLayerCategoryInfo(layerIndex, category) == categoryName then return category end
@@ -685,6 +391,7 @@ end
 
 -- get keybind action index by name
 function MailR.GetKeybindActionIndex(layerIndex, categoryIndex, actionName)
+  MailR.dm("Debug", "GetKeybindActionIndex")
   local categoryName, numActions = GetActionLayerCategoryInfo(layerIndex, categoryIndex)
   for action = 1, numActions do
     if GetActionInfo(layerIndex, categoryIndex, action) == actionName then return action end
@@ -695,6 +402,7 @@ end
 
 -- get only the primary keybind. Suspect there is a oneliner API func somewhere
 function MailR.GetPrimaryKeybindInfo(layerName, categoryName, actionName)
+  MailR.dm("Debug", "GetPrimaryKeybindInfo")
   local primaryBindIndex = 1
   local layerIndex = MailR.GetKeybindLayerIndex(layerName)
   local categoryIndex = MailR.GetKeybindCategoryIndex(layerIndex, categoryName)
@@ -706,6 +414,7 @@ end
 
 -- somebody updated their keybinds so we should probably update too
 function MailR.UpdateKeybindInfo(eventCode)
+  MailR.dm("Debug", "UpdateKeybindInfo")
   local replyKeybind = MailR.GetPrimaryKeybindInfo(GetString(SI_KEYBINDINGS_LAYER_GENERAL), "MailR",
     "MAIL_REPLY")
   local forwardKeybind = MailR.GetPrimaryKeybindInfo(GetString(SI_KEYBINDINGS_LAYER_GENERAL), "MailR",
@@ -741,6 +450,7 @@ function MailR.GenerateMailId()
 end
 
 function MailR.rtrim(s)
+  MailR.dm("Debug", "rtrim")
   local n = #s
   while n > 0 and s:find("^%s", n) do n = n - 1 end
   return s:sub(1, n)
@@ -770,6 +480,7 @@ end
 
 -- clear current message table
 function MailR.ClearCurrentSendMessage()
+  MailR.dm("Debug", "ClearCurrentSendMessage")
   MailR.currentSendMessageInfo["recipient"] = ""
   MailR.currentSendMessageInfo["subject"] = ""
   MailR.currentSendMessageInfo["body"] = ""
@@ -785,6 +496,7 @@ end
 
 -- copy message_table to a new table
 function MailR.CopyMessage(messageToCopy)
+  MailR.dm("Debug", "CopyMessage")
   local copyMessage = {}
   copyMessage["recipient"] = messageToCopy["recipient"]
   copyMessage["subject"] = messageToCopy["subject"]
@@ -825,12 +537,14 @@ end
 
 -- called when attached money updated
 function MailR.AttachmentMoneyChanged(eventCode, gold)
+  MailR.dm("Debug", "AttachmentMoneyChanged")
   MailR.currentSendMessageInfo["gold"] = gold
   MailR.currentSendMessageInfo["postage"] = GetQueuedMailPostage()
 end
 
 -- called when changed from gold payment to COD
 function MailR.CODChanged()
+  MailR.dm("Debug", "CODChanged")
   if GetQueuedCOD() > 0 then
     MailR.currentSendMessageInfo["cod"] = true
     MailR.currentSendMessageInfo["gold"] = GetQueuedCOD()
@@ -838,114 +552,6 @@ function MailR.CODChanged()
     MailR.currentSendMessageInfo["cod"] = false
   end
   MailR.currentSendMessageInfo["postage"] = GetQueuedMailPostage()
-end
-
-function MailR.GuildMailSent(eventCode, playerName)
-  MailR.dm("Debug", "GuildMailSent")
-  MailR.WaitingForResponse = false
-  local k, v = next(MailR.GuildRecipients)
-  if k == nil or MailR.CancelGuildMail then
-    MailR.FinishedGuildMail()
-    return
-  end
-  MailR.guildies[MailR.LastKnownRecipient.name].recipient = false
-  MailR.RecipientCount = MailR.RecipientCount + 1
-  SendProgressStatus:SetValue(MailR.RecipientCount)
-  SendProgressLabel:SetText("Sent " .. tostring(MailR.RecipientCount) .. "/" .. tostring(MailR.GuildRecipientCount))
-  if not MailR.GuildThrottleTimer:IsStarted() then
-    MailR.SendGuildMailMessage(k)
-  end
-  MailR.GuildControl:RefreshVisible()
-end
-
-function MailR.GuildMailFailSent()
-  MailR.dm("Debug", "Mail Failed To Send To")
-  MailR.dm("Debug", MailR.LastKnownRecipient)
-  MailR.WaitingForResponse = false
-  local k, v = next(MailR.GuildRecipients)
-  if k == nil or MailR.CancelGuildMail then
-    MailR.FinishedGuildMail()
-    return
-  end
-  MailR.RecipientCount = MailR.RecipientCount + 1
-  SendProgressStatus:SetValue(MailR.RecipientCount)
-  SendProgressLabel:SetText("Sent " .. tostring(MailR.RecipientCount) .. "/" .. tostring(MailR.GuildRecipientCount))
-  if not MailR.GuildThrottleTimer:IsStarted() then
-    MailR.SendGuildMailMessage(k)
-  end
-end
-
-function MailR.FinishedGuildMail()
-  MailR.dm("Debug", "FinishedGuildMail")
-  MAIL_SEND:ClearFields()
-  QueueMoneyAttachment(0) -- just to make sure
-  MailR.GuildThrottleTimer:Stop()
-  SendProgress:SetHidden(true)
-
-  local k, v = next(MailR.GuildRecipients)
-  MailR.GuildRecipients = {}
-  if MailR.CancelGuildMail and k ~= nil then
-    local toStr = MailR.queuedSentMessage["recipient"]:gsub(" %([0-9]*%)", "")
-    toStr = toStr .. " (" .. tostring(MailR.RecipientCount) .. "/" .. tostring(MailR.GuildRecipientCount) .. ")"
-    MailR.queuedSentMessage["recipient"] = toStr
-    MailR.MailSentSuccessfully()
-  end
-  MailR.GuildMailRecipientsReady = false
-  MailR.GuildRecipientCount = 0
-  MailR.RecipientCount = 0
-  MailR.ThrottledRecipients = 0
-  GuildiesButton:SetEnabled(true)
-  MailR.GuildControl:RefreshVisible()
-end
-
-function MailR.SendGuildMail()
-  if not MailR.GuildMailRecipientsReady then return end
-  MailR.GuildMailRecipientsReady = false
-  MailR.GuildRecipients = {}
-  MailR.GuildRecipient = {}
-  MailR.LastKnownGuild = MailR.CurrentKnownGuild
-  MailR.CancelGuildMail = false
-  MailR.queuedSentMessage["body"] = MailR.queuedSentMessage["body"] .. "\n\nSent via MailR's Guild Mail"
-  MailR.GuildRecipientCount = 0
-  for k, v in pairs(MailR.guildies) do
-    if GetDisplayName() ~= k and v["recipient"] then
-      MailR.GuildRecipients[k] = v
-      MailR.GuildRecipientCount = MailR.GuildRecipientCount + 1
-    end
-  end
-  local k, v = next(MailR.GuildRecipients)
-  if k == nil then
-    MailR.FinishedGuildMail()
-    return
-  end
-
-  SendProgressStatus:SetMinMax(0, MailR.GuildRecipientCount)
-  SendProgress:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
-  ThrottleTimer:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
-  SendProgressButton:SetEnabled(true)
-  GuildiesButton:SetEnabled(false)
-  SendProgress:SetDrawLayer(3)
-  SendProgressStatus:SetValue(0)
-  MailR.RecipientCount = 0
-  MailR.ThrottledRecipients = 0
-  SendProgress:SetHidden(false)
-  SendProgressLabel:SetText("Sent 0/" .. tostring(MailR.GuildRecipientCount))
-  MailR.SendGuildMailMessage(k)
-end
-
-function MailR.SendGuildMailMessage(recipient)
-  MailR.dm("Debug", "Sending GM To " .. recipient)
-  local body = MailR.queuedSentMessage["body"]
-  local subject = MailR.queuedSentMessage["subject"]
-  MailR.WaitingForResponse = true
-  MailR.LastKnownRecipient = MailR.GuildRecipients[recipient]
-  SendMail(recipient, subject, body)
-  MailR.GuildRecipients[recipient] = nil
-  MailR.ThrottledRecipients = MailR.ThrottledRecipients + 1
-  if MailR.ThrottledRecipients >= MailR.ThrottleRecipients then
-    MailR.ThrottledRecipients = 0
-    MailR.GuildThrottleTimer:Start(GetFrameTimeSeconds(), GetFrameTimeSeconds() + MailR.SavedMail.throttle_time + 1)
-  end
 end
 
 -- when SendMail is called do this first, otherwise currentSendMessageInfo gets cleared (by ZOS)
@@ -1002,6 +608,7 @@ function MailR.ShowPlayerContextMenu(self, playerName, rawName)
 end
 
 function MailR.ShowPlayerInteractMenu(self, isIgnored)
+  MailR.dm("Debug", "ShowPlayerInteractMenu")
   local currentTarget = self.currentTargetCharacterName
   local icons = {
     enabledNormal = "EsoUI/Art/Mail/mail_tabicon_compose_up.dds",
@@ -1017,6 +624,7 @@ function MailR.ShowPlayerInteractMenu(self, isIgnored)
 end
 
 function MailR.CheckMailIdEquality(mailId1, mailId2)
+  MailR.dm("Debug", "CheckMailIdEquality")
   return mailId1 == mailId2
 end
 
@@ -1026,24 +634,15 @@ function MailR.MailIdEquality(...)
   return true
 end
 
-function MailR.GetMailData(self, mailId)
-  if (self.masterList) then
-    for i = 1, #self.masterList do
-      local data = self.masterList[i]
-      if data.mailId == mailId then
-        return data
-      end
-    end
-  end
-end
-
 function MailR.HasAlreadyReportedSelectedMail(self)
+  MailR.dm("Debug", "HasAlreadyReportedSelectedMail")
   if MailR.IsMailIdSentMail(self.mailId) then return end
   return self.reportedMailIds[zo_getSafeId64Key(self.mailId)]
 end
 
 MailR.defaultMailInboxFn = {}
 function MailR.OverloadMailInbox()
+  MailR.dm("Debug", "OverloadMailInbox")
   local originalIsMailReturnable = IsMailReturnable
   IsMailReturnable = function(mailId)
     if MailR.IsMailIdSentMail(mailId) then
@@ -1055,43 +654,13 @@ function MailR.OverloadMailInbox()
     end
   end
   --[[ removed because it is not a ScrollList now
-    MAIL_INBOX.IsMailReturnable = IsMailReturnable -- redefined above
 
-    IsMailReturnable = function(mailId)
-                            if MailR.IsMailIdSentMail(mailId) then
-                                return false
-                            else
-                                return MAIL_INBOX.IsMailReturnable(mailId)
-                            end
-                        end
-    MAIL_INBOX.IsMailReturnable = IsMailReturnable
-
-    MAIL_INBOX.BuildMasterList = MailR.BuildMasterList
-    MAIL_INBOX.OnSelectionChanged = MailR.OnSelectionChanged
-    MAIL_INBOX.OnMailReadable = MailR.OnMailReadable
-    MAIL_INBOX.RefreshAttachmentSlots = MailR.RefreshAttachmentSlots
-    MAIL_INBOX.RefreshMoneyControls = MailR.RefreshMoneyControls
-    MAIL_INBOX.RefreshAttachmentsHeaderShown = MailR.RefreshAttachmentsHeaderShown
-    MAIL_INBOX.GetMailData = MailR.GetMailData
     MAIL_INBOX.RequestReadMessage = MailR.RequestReadMessage
     MAIL_INBOX.HasAlreadyReportedSelectedMail = MailR.HasAlreadyReportedSelectedMail
-    local MAIL_DATA = 1
-  MailR.dm("Debug", MAIL_DATA)
-  local mailListData = MAIL_INBOX.masterList or {}
-  mailListData[1] = {nothing = true}
-  mailListData.dataTypes = {}
-  mailListData.dataTypes[MAIL_DATA] = {}
-  mailListData.dataTypes[MAIL_DATA].equalityFunction = {}
-  MailR.dm("Debug", mailListData)
-  MailR.dm("Debug", "ZO_ScrollList_SetEqualityFunction")
-    ZO_ScrollList_SetEqualityFunction(mailListData, MAIL_DATA, function(...) MailR.MailIdEquality(...) end)
-    GetNextMailId = MailR.GetNextMailId
     ZO_MailInboxRow_OnMouseUp = MailR.OnMouseUp
-    MAIL_INBOX.GetMailItemInfo = GetMailItemInfo
-    GetMailItemInfo = MailR.GetMailItemInfo
     ZO_PlayerToPlayer.ShowPlayerInteractMenu = MailR.ShowPlayerInteractMenu
-  ]]--
   CHAT_SYSTEM.ShowPlayerContextMenu = MailR.ShowPlayerContextMenu
+  ]]--
   MAIL_INBOX.IsMailDeletable = MailR.IsMailDeletable
   MAIL_INBOX.ConfirmDelete = MailR.ConfirmDelete
   MAIL_INBOX.Delete = MailR.Delete
@@ -1106,41 +675,10 @@ function MailR.OverloadMailInbox()
   MAIL_INBOX:InitializeKeybindDescriptors()
 end
 
-function MailRGuild:Update()
-  self:RefreshData()
-end
-
 function MailR.OverloadMailSend()
+  MailR.dm("Debug", "OverloadMailSend")
   MAIL_SEND.InitializeKeybindDescriptors = MailR.InitializeSendKeybindDescriptors
   MAIL_SEND:InitializeKeybindDescriptors()
-
-  local dropdownContainer = CreateControlFromVirtual("GuildiesDropdown", Guildies, "ZO_StatsDropdownRow")
-  dropdownContainer:SetAnchor(TOPLEFT, GuildiesHeading, BOTTOMLEFT, 0, 16)
-  dropdownContainer:GetNamedChild("Dropdown"):SetWidth(200)
-  -- MailR.GuildDropdown = dropdownContainer.dropdown
-  GuildiesDropdown:SetWidth(200)
-
-  local dropdownLogicContainer = CreateControlFromVirtual("GuildiesLogicDropdown", Guildies, "ZO_StatsDropdownRow")
-  dropdownLogicContainer:SetAnchor(TOPLEFT, GuildiesDropdown, TOPRIGHT, 2, 0)
-  dropdownLogicContainer:GetNamedChild("Dropdown"):SetWidth(60)
-  -- MailR.GuildLogicDropdown = dropdownLogicContainer.dropdown
-  GuildiesLogicDropdown:SetWidth(60)
-
-  local dropdownRankContainer = CreateControlFromVirtual("GuildiesRankDropdown", Guildies, "ZO_StatsDropdownRow")
-  dropdownRankContainer:SetAnchor(TOPLEFT, GuildiesLogicDropdown, TOPRIGHT, 2, 0)
-  dropdownRankContainer:GetNamedChild("Dropdown"):SetWidth(128)
-  -- MailR.GuildRankDropdown = dropdownRankContainer.dropdown
-  GuildiesRankDropdown:SetWidth(128)
-
-  local dropdownStatusContainer = CreateControlFromVirtual("GuildiesStatusDropdown", Guildies, "ZO_StatsDropdownRow")
-  dropdownStatusContainer:SetAnchor(TOPLEFT, GuildiesRankDropdown, TOPRIGHT, 2, 0)
-  dropdownStatusContainer:GetNamedChild("Dropdown"):SetWidth(88)
-  -- MailR.GuildStatusDropdown = dropdownStatusContainer.dropdown
-  GuildiesStatusDropdown:SetWidth(88)
-
-  GuildiesHeaders:SetAnchor(TOPLEFT, GuildiesDropdown, BOTTOMLEFT, 0, 16)
-
-  MailR.GuildControl = MailRGuild:New()
 end
 
 function MailR.Guild_MouseEnter(control)
@@ -1151,27 +689,8 @@ function MailR.Guild_MouseExit(control)
   MailR.GuildControl:Row_OnMouseExit(control)
 end
 
-function MailR.ShowGuildiesFailed()
-  if #MailR.LastKnownGuild == 0 then return end
-  local count = 0
-  for k, v in pairs(MailR.failed_guildies) do
-    count = count + 1
-  end
-  if count == 0 then return end
-  MailR.GuildDropdown:SelectItem(MailR.LastKnownGuild[2])
-  for k, v in pairs(MailR.guildies) do
-    d(k, v)
-    if MailR.failed_guildies[k] ~= nil then
-      MailR.guildies[k].recipient = true
-    else
-      MailR.guildies[k].recipient = false
-    end
-  end
-
-  MailR.GuildControl:RefreshVisible()
-end
-
 function MailR.Guild_MouseUp(control, button, upInside)
+  MailR.dm("Debug", "Guild_MouseUp")
   -- contro.data.name, etc
   local pressed_button = 1
   local api_ver = GetAPIVersion()
@@ -1192,90 +711,8 @@ function MailR.Guild_MouseUp(control, button, upInside)
   --MailR.Guild:MouseEnter(control, button, upInside)
 end
 
-MailR.SORT_KEYS = {
-  ["name"] = {},
-  ["status"] = { tiebreaker = "name" },
-  ["rankName"] = { tiebreaker = "status" },
-  ["recipient"] = { tiebreaker = "rankName" }
-}
-
-function MailRGuild:New()
-  local guildies = ZO_SortFilterList.New(self, Guildies)
-
-  guildies.masterList = {}
-  --self.sortHeaderGroup:SelectHeaderByKey("timeStamp")
-
-  ZO_ScrollList_AddDataType(guildies.list, 1, "GuildiesRow", 30,
-    function(control, data) self:SetupGuildiesRow(control, data) end, nil, nil)
-
-  ZO_ScrollList_EnableHighlight(guildies.list, "ZO_ThinListHighlight")
-  guildies.sortFunction = function(listEntry1, listEntry2) return ZO_TableOrderingFunction(listEntry1.data,
-    listEntry2.data, guildies.currentSortKey, MailR.SORT_KEYS, guildies.currentSortOrder) end
-
-  guildies:RefreshData()
-  return guildies
-end
-
-function MailRGuild:BuildMasterList()
-  self.masterList = {}
-  local guildies = MailR.guildies
-  for k, v in pairs(guildies) do
-    local data = v
-    data["name"] = k
-    table.insert(self.masterList, data)
-  end
-end
-
-function MailRGuild:FilterScrollList()
-  local scrollData = ZO_ScrollList_GetDataList(self.list)
-  ZO_ClearNumericallyIndexedTable(scrollData)
-
-  for i = 1, #self.masterList do
-    local data = self.masterList[i]
-    table.insert(scrollData, ZO_ScrollList_CreateDataEntry(1, data))
-  end
-end
-
-function MailRGuild:SortScrollList()
-  local scrollData = ZO_ScrollList_GetDataList(self.list)
-  table.sort(scrollData, self.sortFunction)
-end
-
-MailR.ONLINE_TEXT = ZO_ColorDef:New(0.4627, 0.737, 0.7647, 1)
-MailR.OFFLINE_TEXT = ZO_ColorDef:New(0.4, 0.4, 0.4, 1)
-function MailRGuild:SetupGuildiesRow(control, data)
-  control.data = data
-  control.name = GetControl(control, "Name")
-  control.status = GetControl(control, "Status")
-  control.recipient = GetControl(control, "Recipient")
-  control.rank = GetControl(control, "Rank")
-
-  control.name:SetText(data.name)
-  control.rank:SetText(data.rankName)
-  control.recipient:SetText("Yes")
-  control.status:SetText("Online")
-  if data.recipient == false then
-    control.recipient:SetText("No")
-  end
-
-  control.name.normalColor = MailR.ONLINE_TEXT
-  control.rank.normalColor = MailR.ONLINE_TEXT
-  control.recipient.normalColor = MailR.ONLINE_TEXT
-  control.status.normalColor = MailR.ONLINE_TEXT
-
-  if not data.status then
-    control.status:SetText("Offline")
-    control.name.normalColor = MailR.OFFLINE_TEXT
-    control.rank.normalColor = MailR.OFFLINE_TEXT
-    control.recipient.normalColor = MailR.OFFLINE_TEXT
-    control.status.normalColor = MailR.OFFLINE_TEXT
-  end
-  self:SetLockedForUpdates(true)
-  ZO_SortFilterList.SetupRow(self, control, data)
-  self:SetLockedForUpdates(false)
-end
-
 function MailR.InitializeInboxKeybindDescriptors(self)
+  MailR.dm("Debug", "InitializeInboxKeybindDescriptors")
 
   local function ReportAndDeleteCallback()
     self:RecordSelectedMailAsReported()
@@ -1357,6 +794,33 @@ function MailR.InitializeInboxKeybindDescriptors(self)
       end
     },
 
+    --Take All
+    {
+      name = function()
+        if self.mailId then
+          local mailData = self:GetMailData(self.mailId)
+          return GetString("SI_MAILCATEGORY_TAKEALL", mailData.category)
+        end
+      end,
+      keybind = "UI_SHORTCUT_QUATERNARY",
+      callback = function()
+        if self.mailId then
+          local mailData = self:GetMailData(self.mailId)
+          ZO_Dialogs_ShowPlatformDialog("MAIL_CONFIRM_TAKE_ALL", { category = mailData.category })
+        end
+      end,
+      visible = function()
+        if self.mailId then
+          local mailData = self:GetMailData(self.mailId)
+          if mailData then
+            local canTakeAttachments = CanTryTakeAllMailAttachmentsInCategory(mailData.category, MAIL_MANAGER:ShouldDeleteOnClaim())
+            return canTakeAttachments
+          end
+        end
+        return false
+      end,
+    },
+
     --Report Player
     {
       name = GetString(SI_MAIL_READ_REPORT_PLAYER),
@@ -1426,6 +890,7 @@ function MailR.InitializeInboxKeybindDescriptors(self)
 end
 
 function MailR:InitializeSendKeybindDescriptors()
+  MailR.dm("Debug", "InitializeSendKeybindDescriptors")
   self.staticKeybindStripDescriptor = {
     alignment = KEYBIND_STRIP_ALIGN_CENTER,
 
@@ -1460,95 +925,52 @@ function MailR.ConfirmDelete(self)
     MAIL_INBOX:RefreshData()
     return
   end
-
-  -- original
-  if self.mailId and not IsMailReturnable(self.mailId) then
-    DeleteMail(self.mailId, true)
-    PlaySound(SOUNDS.MAIL_ITEM_DELETED)
-  end
+  MailR.dm("Warn", "Shit Hit The Fan!")
 end
 
 function MailR.Delete(self)
   MailR.dm("Debug", "Delete")
   MailR.dm("Debug", self.mailId)
   if MailR.IsMailIdSentMail(self.mailId) then
-    self:ConfirmDelete()
+    self.ConfirmDelete()
     return
   end
 
   -- original
   if self.mailId then
-    if self:IsMailDeletable() then
-      local numAttachments, attachedMoney = GetMailAttachmentInfo(self.mailId)
-
-      if numAttachments > 0 and attachedMoney > 0 then
-        ZO_Dialogs_ShowDialog("DELETE_MAIL_ATTACHMENTS_AND_MONEY", self.mailId)
-      elseif numAttachments > 0 then
-        ZO_Dialogs_ShowDialog("DELETE_MAIL_ATTACHMENTS", self.mailId)
-      elseif attachedMoney > 0 then
-        ZO_Dialogs_ShowDialog("DELETE_MAIL_MONEY", self.mailId)
-      else
-        if MailR.SavedMail.disableDeleteConfirmation then
-          --no confirmation popup, immediately delete
-          self:ConfirmDelete()
-        else
-          ZO_Dialogs_ShowDialog("DELETE_MAIL", { callback = function(...) self:ConfirmDelete(...) end, mailId = self.mailId })
-        end
-      end
+    if self.IsMailDeletable() then
+      DeleteMail(self.mailId)
+    else
+      ZO_Dialogs_ShowPlatformDialog(
+        "DELETE_MAIL",
+        {
+          confirmationCallback = function(...)
+            DeleteMail(self.mailId)
+            PlaySound(SOUNDS.MAIL_ITEM_DELETED)
+          end,
+          mailId = self.mailId,
+        }
+      )
     end
   end
 end
 
-function MailR.IsMailDeletable(self)
-  if MailR.IsMailIdSentMail(self.mailId) then
+function MailR.IsMailDeletable()
+  MailR.dm("Debug", "IsMailDeletable")
+  local mailId = MAIL_INBOX.mailId
+  if not mailId then return end
+  if MailR.IsMailIdSentMail(mailId) then
     return true
   end
 
-  -- original
-  local mailData = self:GetMailData(self.mailId)
-  if mailData then
-    return mailData.attachedMoney == 0 and mailData.numAttachments == 0
-  end
-end
-
-function MailR.GetMailItemInfo(mailId)
-  if not MailR.IsMailIdSentMail(mailId) then
-    local senderDisplayName, senderCharacterName, subject, icon, unread, fromSystem, fromCustomerService, returned, numAttachments, attachedMoney, codAmount, expiresInDays, secsSinceReceived = MAIL_INBOX.GetMailItemInfo(mailId)
-    return senderDisplayName, senderCharacterName, subject, icon, unread, fromSystem, fromCustomerService, returned, numAttachments, attachedMoney, codAmount, expiresInDays, secsSinceReceived
-  else
-    local message = MailR.GetSentMessageFromMailId(mailId)
-    local senderDisplayName = message.recipient
-    local senderCharacterName = ""
-    local subject = message.subject
-    local icon = "/esoui/art/mail/mail_inbox_readmessage.dds"
-    local unread = false
-    local fromSystem = false
-    local fromCustomerService = false
-    local returned = false
-    local count = 0
-    for i = 1, MailR.MAX_ATTACHMENTS do
-      if message.attachments[i].stack ~= nil then
-        count = count + 1
-      end
-    end
-    local numAttachments = count
-    local codAmount = 0
-    local attachedMoney = 0
-    if message.cod then
-      codAmount = message.gold
-      attachedMoney = 0
-    else
-      codAmount = 0
-      attachedMoney = message.gold
-    end
-    local expiresInDays = 1
-    local secsSinceReceived = GetDiffBetweenTimeStamps(GetTimeStamp(), message.timeSent)
-
-    return senderDisplayName, senderCharacterName, subject, icon, unread, fromSystem, fromCustomerService, returned, numAttachments, attachedMoney, codAmount, expiresInDays, secsSinceReceived
-  end
+  -- To mimic original ZOS function
+  local numAttachments, attachedMoney = GetMailAttachmentInfo(mailId)
+  local noAttachments = numAttachments == 0 and attachedMoney == 0
+  return noAttachments
 end
 
 function MailR.GetMailAttachmentInfo(self, mailId)
+  MailR.dm("Debug", "GetMailAttachmentInfo")
   if MailR.IsMailIdSentMail(mailId) then
     local message = MailR.GetSentMessageFromMailId(mailId)
     return message.numAttachments, message.gold
@@ -1558,6 +980,7 @@ function MailR.GetMailAttachmentInfo(self, mailId)
 end
 
 function MailR.RequestReadMessage(self, mailId)
+  MailR.dm("Debug", "RequestReadMessage")
   -- this should not be called if mailId is a MAILR id, but the previously/currently selected
   -- mailId can be a MAILR id causing the AreId64sEqual check to fail, when really
   -- we want it to request read mail
@@ -1569,380 +992,38 @@ function MailR.RequestReadMessage(self, mailId)
   end
 end
 
-function MailR.OnSelectionChanged(self, previouslySelected, selected, reselectingDuringRebuild)
-  ZO_SortFilterList.OnSelectionChanged(self, previouslySelected, selected)
-  if (not reselectingDuringRebuild) then
-    if selected and MailR.IsMailIdSentMail(selected.mailId) then
-      MailR.OnMailReadable(self, selected.mailId)
-      MailR.InboxMessageSelected(nil, selected.mailId)
-    elseif (selected) then
-      MAIL_INBOX:RequestReadMessage(selected.mailId)
-    else
-      MAIL_INBOX:EndRead()
-    end
-  end
-end
-
 function GetMailFlags(mailId)
+  MailR.dm("Debug", "GetMailFlags")
   local unread, returned, fromSystem, fromCustomerService = select(5, GetMailItemInfo(mailId))
   return unread, returned, fromSystem, fromCustomerService
 end
 
 function GetMailAttachmentInfo(mailId)
+  MailR.dm("Debug", "GetMailAttachmentInfo")
   local numAttachments, attachedMoney, codAmount = select(9, GetMailItemInfo(mailId))
   return numAttachments, attachedMoney, codAmount
 end
 
 function GetMailSender(mailId)
+  MailR.dm("Debug", "GetMailSender")
   local senderDisplayName, senderCharacterName = GetMailItemInfo(mailId)
   return senderDisplayName, senderCharacterName
 end
 
-function MailR.GetNextMailIdIter(state, var1)
-  return GetNextMailId(var1)
-end
-
-function MailR.GetNextMailId(mailId)
-  local nextMailId = nil
-
-  if not MailR.IsMailIdSentMail(mailId) then
-    --valid mailId or nil to get first message
-    nextMailId = GetNextMailId_Orig(mailId)
-  end
-
-  if nextMailId == nil then
-    --custom mailId or no next mail in the inbox, try to get next Id from saved mail
-    nextMailId = next(MailR.SavedMail.sent_messages, mailId)
-  end
-
-  return nextMailId
-end
-
 function MailR.IsMailIdSentMail(mailId)
+  MailR.dm("Debug", "IsMailIdSentMail")
   if type(mailId) ~= "string" then return false end
   -- local uniqueMailID = Id64ToString(mailId)
   if mailId == nil or MailR.SavedMail.sent_messages[mailId] == nil then return false end
   return true
 end
 
-function MailR.GetSentMessageFromMailId(mailId)
-  if MailR.IsMailIdSentMail(mailId) then
-    return MailR.SavedMail.sent_messages[mailId]
-  else
-    return nil
-  end
-end
 
-function MailR.GenerateBodyMessageForViewing(message)
-  local originalBody = message.body .. "\n\n"
-  local attachedGoldStr = MailR.localeStringMap[MailR.effective_lang]["Attached Gold: "]
-  local codStr = MailR.localeStringMap[MailR.effective_lang]["COD: "]
-  local postageStr = MailR.localeStringMap[MailR.effective_lang]["Postage: "]
-  local attachmentStr = MailR.localeStringMap[MailR.effective_lang]["Attachments: "]
-  local goldString = MailR.DEFAULT_HEADER_COLOR_STRING .. attachedGoldStr .. MailR.RESET_COLOR_STRING .. tostring(message.gold) .. "\n"
-  local codString
-  if message.cod then
-    codString = MailR.DEFAULT_HEADER_COLOR_STRING .. codStr .. MailR.RESET_COLOR_STRING .. "Yes\n"
-  else
-    codString = MailR.DEFAULT_HEADER_COLOR_STRING .. codStr .. MailR.RESET_COLOR_STRING .. "No\n"
-  end
-  local postageString = MailR.DEFAULT_HEADER_COLOR_STRING .. postageStr .. MailR.RESET_COLOR_STRING .. tostring(message.postage) .. "\n"
-  local attachmentString = MailR.DEFAULT_HEADER_COLOR_STRING .. attachmentStr .. "\n" .. MailR.RESET_COLOR_STRING
-  for i = 1, MailR.MAX_ATTACHMENTS do
-    -- message.numAttachments do
-    if message.attachments[i].stack ~= nil then
-      local count = message.attachments[i].stack
-      local link = message.attachments[i].link
-      attachmentString = attachmentString .. tostring(count) .. "x" .. link .. "\n"
-    end
-  end
-  local bodyString = originalBody .. goldString .. codString .. postageString .. attachmentString
-  return bodyString
-end
-
-function MailR.OnMailReadable(self, mailId)
-  if self.control:IsHidden() then
-    self.dirtyMail = mailId
-    return
-  end
-  self.dirtyMail = nil
-  self:EndRead()
-
-  local sentMail = MailR.IsMailIdSentMail(mailId)
-  if sentMail then
-    sentMail = MailR.SavedMail.sent_messages[mailId]["isSentMail"]
-    -- required to support old saved mail
-    if sentMail == nil then
-      sentMail = true
-    end
-  else
-    sentMail = nil
-  end
-
-  self.mailId = mailId
-  self.messageControl:SetHidden(false)
-  KEYBIND_STRIP:UpdateKeybindButtonGroup(self.selectionKeybindStripDescriptor)
-  -- do this here instead of above so controls from KeybindButtonGroup display correctly
-  self.mailId = mailId
-
-  local mailData
-  if sentMail ~= nil then
-    local sentMessage = MailR.GetSentMessageFromMailId(mailId)
-    mailData = MailR.ConvertSavedMessageToMailData(mailId, sentMessage)
-  else
-    mailData = self:GetMailData(mailId)
-    ZO_MailInboxShared_PopulateMailData(mailData, mailId)
-  end
-  ZO_ScrollList_RefreshVisible(self.list, mailData)
-
-  -- start custom ZO_MailInboxShared_UpdateInbox
-  local body
-  if sentMail ~= nil then
-    body = MailR.GenerateBodyMessageForViewing(MailR.GetSentMessageFromMailId(mailId))
-  else
-    body = ReadMail(mailId)
-    if (body == "") then
-      body = GetString(SI_MAIL_READ_NO_BODY)
-    end
-  end
-
-  local fromLabel = GetControl(self.messageControl, "From")
-  fromLabel:SetText(mailData.senderDisplayName)
-  if sentMail == true then
-    GetControl(self.messageControl, "FromLabel"):SetText(MailR.localeStringMap[MailR.effective_lang]["To:"])
-    GetControl(self.messageControl, "ReceivedLabel"):SetText(MailR.localeStringMap[MailR.effective_lang]["Sent:"])
-  else
-    GetControl(self.messageControl, "FromLabel"):SetText(GetString(SI_MAIL_READ_FROM_LABEL))
-    GetControl(self.messageControl, "ReceivedLabel"):SetText(GetString(SI_MAIL_READ_RECEIVED_LABEL))
-  end
-  if (mailData.fromCS or mailData.fromSystem) then
-    fromLabel:SetColor(ZO_GAME_REPRESENTATIVE_TEXT:UnpackRGBA())
-  else
-    fromLabel:SetColor(ZO_SELECTED_TEXT:UnpackRGBA())
-  end
-
-  GetControl(self.messageControl, "Subject"):SetText(mailData:GetFormattedSubject())
-  GetControl(self.messageControl, "Expires"):SetText(mailData:GetExpiresText())
-  GetControl(self.messageControl, "Received"):SetText(mailData:GetReceivedText())
-  GetControl(self.messageControl, "Body"):SetText(body)
-  -- end custom ZO_MailInboxShared_UpdateInbox
-  --ZO_MailInboxShared_UpdateInbox(mailData, GetControl(self.messageControl, "From"), GetControl(self.messageControl, "Subject"), GetControl(self.messageControl, "Expires"), GetControl(self.messageControl, "Received"), GetControl(self.messageControl, "Body"))
-  ZO_Scroll_ResetToTop(GetControl(self.messageControl, "Pane"))
-
-  self:RefreshMoneyControls()
-  self:RefreshAttachmentsHeaderShown()
-  self:RefreshAttachmentSlots()
-end
 
 MailR.MAX_READ_ATTACHMENTS = MailR.MAX_ATTACHMENTS + 1
-function MailR.RefreshAttachmentSlots(self)
-  local sentMail = MailR.IsMailIdSentMail(self.mailId)
-  local mailData
-  local sentMessage
-  if sentMail then
-    sentMessage = MailR.GetSentMessageFromMailId(self.mailId)
-    mailData = MailR.ConvertSavedMessageToMailData(self.mailId, sentMessage)
-  else
-    mailData = self:GetMailData(self.mailId)
-  end
-  local numAttachments = mailData.numAttachments
-
-  -- have to do this for now, I really need to update the savedvariable table to not have static attachment allocations
-  local sentMailAttachments = {}
-  if sentMail then
-    for i = 1, MailR.MAX_ATTACHMENTS do
-      if sentMessage.attachments[i].stack ~= nil then
-        table.insert(sentMailAttachments, sentMessage.attachments[i])
-      end
-    end
-  end
-
-  for i = 1, numAttachments do
-    self.attachmentSlots[i]:SetHidden(false)
-    local icon, stack, creator
-    if sentMail then
-      icon = sentMailAttachments[i].icon
-      stack = sentMailAttachments[i].stack
-    else
-      icon, stack, creator = GetAttachedItemInfo(self.mailId, i)
-    end
-    if sentMail then
-      -- I think this can be done by using the button control EnableMouseButton function
-      -- will try in code refactor
-      self.attachmentSlots[i]:SetHandler("OnMouseEnter", function(...) end)
-      self.attachmentSlots[i]:SetHandler("OnClicked", function(...) end)
-      self.attachmentSlots[i]:SetHandler("OnMouseDoubleClicked", function(...) end)
-      self.attachmentSlots[i]:SetMouseOverTexture("/esoui/art/buttons/decline_up.dds")
-      self.attachmentSlots[i]:SetMouseOverBlendMode(TEX_BLEND_MODE_ALPHA)
-      self.attachmentSlots[i]:SetPressedTexture("/esoui/art/buttons/decline_up.dds")
-    else
-      self.attachmentSlots[i]:SetHandler("OnMouseEnter", function(...) MailR.defaultMailInboxFn[i][1](...) end)
-      self.attachmentSlots[i]:SetHandler("OnClicked", function(...) MailR.defaultMailInboxFn[i][2](...) end)
-      self.attachmentSlots[i]:SetHandler("OnMouseDoubleClicked", function(...) MailR.defaultMailInboxFn[i][3](...) end)
-      self.attachmentSlots[i]:SetMouseOverTexture("")
-      self.attachmentSlots[i]:SetPressedTexture("")
-    end
-    ZO_Inventory_SetupSlot(self.attachmentSlots[i], stack, icon)
-  end
-
-  for i = numAttachments + 1, MailR.MAX_READ_ATTACHMENTS do
-    self.attachmentSlots[i]:SetHidden(true)
-  end
-end
-
-function MailR.RefreshMoneyControls(self)
-  local sentMail = MailR.IsMailIdSentMail(self.mailId)
-  local mailData
-
-  if sentMail then
-    local sentMessage = MailR.GetSentMessageFromMailId(self.mailId)
-    mailData = MailR.ConvertSavedMessageToMailData(self.mailId, sentMessage)
-  else
-    mailData = self:GetMailData(self.mailId)
-  end
-
-  self.sentMoneyControl:SetHidden(true)
-  self.codControl:SetHidden(true)
-  if (mailData.attachedMoney > 0) then
-    self.sentMoneyControl:SetHidden(false)
-    ZO_CurrencyControl_SetSimpleCurrency(GetControl(self.sentMoneyControl, "Currency"), CURT_MONEY,
-      mailData.attachedMoney, MAIL_COD_ATTACHED_MONEY_OPTIONS)
-  elseif (mailData.codAmount > 0) then
-    self.codControl:SetHidden(false)
-    ZO_CurrencyControl_SetSimpleCurrency(GetControl(self.codControl, "Currency"), CURT_MONEY, mailData.codAmount,
-      MAIL_COD_ATTACHED_MONEY_OPTIONS)
-  end
-end
-
-function MailR.RefreshAttachmentsHeaderShown(self)
-  local numAttachments, attachedMoney
-  if MailR.IsMailIdSentMail(self.mailId) then
-    numAttachments, attachedMoney = MailR.GetMailAttachmentInfo(self.mailId)
-  else
-    numAttachments, attachedMoney = GetMailAttachmentInfo(self.mailId)
-  end
-  local noAttachments = numAttachments == 0 and attachedMoney == 0
-  self.attachmentsHeaderControl:SetHidden(noAttachments)
-  self.attachmentsDividerControl:SetHidden(noAttachments)
-end
-
-function MailR.ConvertSavedMessageToMailData(mailId, message)
-  local mailData = {}
-  mailData.mailId = mailId
-  -- check for nil for old versions of MailR SavedVar
-  if message.isSentMail == true or message.isSentMail == nil then
-    mailData.subject = MailR.DEFAULT_SENT_MAIL_COLOR_STRING .. message.subject
-  else
-    mailData.subject = MailR.DEFAULT_SAVE_MAIL_COLOR_STRING .. message.subject
-  end
-  mailData.formattedSubject = mailData.subject
-  mailData.senderDisplayName = message.recipient
-  mailData.senderCharacterName = ""
-  mailData.expiresInDays = 0
-  mailData.expiresText = "MAILR"
-  mailData.state = 0
-  mailData.unread = false
-  local count = 0
-  for i = 1, MailR.MAX_ATTACHMENTS do
-    if message.attachments[i].stack ~= nil then
-      count = count + 1
-    end
-  end
-  mailData.numAttachments = count--message.numAttachments
-  if message.cod then
-    mailData.codAmount = message.gold
-    mailData.attachedMoney = 0
-  else
-    mailData.attachedMoney = message.gold
-    mailData.codAmount = 0
-  end
-  mailData.secsSinceReceived = GetDiffBetweenTimeStamps(GetTimeStamp(), message.timeSent)
-  mailData.receivedText = ZO_FormatDurationAgo(mailData.secsSinceReceived)
-  mailData.fromSystem = false
-  mailData.fromCS = false
-  mailData.priority = 2
-  mailData.GetFormattedSubject = function(self) return self.formattedSubject end
-  mailData.GetExpiresText = function(self) return self.expiresText end
-  mailData.GetReceivedText = function(self) return self.receivedText end
-  return mailData
-end
-
-function MailR.BuildMasterList(self)
-  if MailR.DEBUG then d("Building Master List") end
-  self.inboxDirty = false
-  self.masterList = {}
-  self.numEmptyRows = 0
-
-  if MailR.SavedMail.display == "inbox" or MailR.SavedMail.display == "all" then
-    for mailId in MailR.GetNextMailIdIter do
-      if not MailR.IsMailIdSentMail(mailId) then
-        local mailData = {}
-        ZO_MailInboxShared_PopulateMailData(mailData, mailId)
-        table.insert(self.masterList, mailData)
-      end
-    end
-  end
-
-  -- add sent mail to masterList
-  if MailR.SavedMail.display == "sent" or MailR.SavedMail.display == "all" then
-    for mailId, messageInfo in pairs(MailR.SavedMail.sent_messages) do
-      if MailR.rtrim(messageInfo["subject"]) == "" then
-        messageInfo.subject = "(No Subject)"
-      end
-      local mailData = MailR.ConvertSavedMessageToMailData(mailId, messageInfo)
-      -- table.insert(self.masterList, mailData)
-    end
-  end
-
-  local listHeight = self.list:GetHeight()
-  local currentHeight = #self.masterList * 50
-  if (currentHeight < listHeight) then
-    self.numEmptyRows = zo_floor((listHeight - currentHeight) / 50)
-  end
-
-  GetControl(self.control, "Empty"):SetHidden(#self.masterList > 0)
-  GetControl(self.control, "Full"):SetHidden(not IsLocalMailboxFull())
-end
-
-function MailR.FilterDisplay(allArgs)
-  -- /mailr inbox
-  -- /mailr sent
-  -- /mailr all
-  local args = ""
-  local var2 = 0
-  local var3 = 0
-  local argNum = 0
-  for w in string.gmatch(allArgs, "%w+") do
-    argNum = argNum + 1
-    if argNum == 1 then args = w end
-    if argNum == 2 then var2 = tonumber(w) end
-    if argNum == 3 then var3 = tonumber(w) end
-  end
-  args = string.lower(args)
-
-  if not args or args == "help" or args == "" or args == "?" then
-    d(colorRavalox .. "[MailR]" .. colorYellow .. " Accepted Commands:")
-    d(colorRavalox .. "[MailR]" .. colorCMDBlue .. " /mailr" .. colorSoftYellow .. " << shows help")
-    d(colorRavalox .. "[MailR]" .. colorCMDBlue .. " /mailr help" .. colorSoftYellow .. " << shows help")
-    d(colorRavalox .. "[MailR]" .. colorCMDBlue .. " /mailer" .. colorSoftYellow .. " << shows MailR settings menu")
-    d(colorRavalox .. "[MailR]" .. colorCMDBlue .. " /mailr inbox" .. colorSoftYellow .. " << shows only saved messages")
-    d(colorRavalox .. "[MailR]" .. colorCMDBlue .. " /mailr sent" .. colorSoftYellow .. " << shows only sent messages")
-    d(colorRavalox .. "[MailR]" .. colorCMDBlue .. " /mailr all" .. colorSoftYellow .. " << shows all messages")
-  end
-  if args == "inbox" then
-    MailR.SavedMail.display = "inbox"
-  elseif args == "sent" then
-    MailR.SavedMail.display = "sent"
-  elseif args == "all" then
-    MailR.SavedMail.display = "all"
-  else
-    d("Unrecognized mailr option. Use inbox, sent, or all.")
-    return
-  end
-  MAIL_INBOX:RefreshData()
-end
 
 function MailR.ConvertSavedMail()
+  MailR.dm("Debug", "ConvertSavedMail")
   -- version 1.0 to 2.0
   if MailR.SavedMail.messages ~= nil then
     MailR.SavedMail.inbox_messages = {}
@@ -1961,6 +1042,7 @@ end
 -- do all this when the addon is loaded
 function MailR.Init(eventCode, addOnName)
   if addOnName ~= "MailR" then return end
+  MailR.dm("Debug", "OnAddonLoaded, Init")
 
   -- Event Registration
   EVENT_MANAGER:RegisterForEvent("MailR_InboxMessageSelected", EVENT_MAIL_READABLE, MailR.InboxMessageSelected)
@@ -1987,8 +1069,7 @@ function MailR.Init(eventCode, addOnName)
       sv[key] = nil
     end
   end
-  MailR.SavedMail.disableDeleteConfirmation
-  MailR:InitLam()
+  MailR.SavedMail.disableDeleteConfirmation = nil -- Removed for U42
 
   if MailR.SavedMail.display == nil then
     MailR.SavedMail.display = "all"
@@ -2026,6 +1107,5 @@ function MailR.Init(eventCode, addOnName)
   MailR.OverloadMailInbox()
   MailR.OverloadMailSend()
   MailR.UpdateKeybindInfo()
-  MailR.GuildThrottleTimer = ZO_TimerBar:New(ThrottleTimer)
 end
 EVENT_MANAGER:RegisterForEvent("MailR_Init", EVENT_ADD_ON_LOADED, MailR.Init)
