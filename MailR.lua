@@ -1,13 +1,15 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.12
+Version: 2.5.14
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
+local LAM = LibAddonMenu2
 
 -- GLOBALS
 MailR = {}
+
 -------------------------------------------------
 ----- early helper                          -----
 -------------------------------------------------
@@ -93,7 +95,7 @@ MailR.SAVED_MAIL_VERSION = "2.0"
 -- default table for above version incase this the first time MailR is used
 MailR.SavedMail_defaults = {
   display = "all",
-  guildMailVisible = false,
+  disableDeleteConfirmation = true,
   mailr_version = MailR.SAVED_MAIL_VERSION,
   sent_count = 0,
   sent_messages = {},
@@ -101,6 +103,7 @@ MailR.SavedMail_defaults = {
   inbox_messages = {},
   throttle_time = 1 --seconds (can be fractional)
 }
+
 -- saved mail
 MailR.SavedMail = nil
 -- Locale vars --
@@ -187,9 +190,48 @@ local ShowPlayerContextMenu_Orig = CHAT_SYSTEM.ShowPlayerContextMenu
 local GetNextMailId_Orig = GetNextMailId
 local ShowPlayerInteractMenu_Orig = ZO_PlayerToPlayer.ShowPlayerInteractMenu
 
+-------------------------------------------------
+----- settings                              -----
+-------------------------------------------------
+
+local panelData = {
+  type = 'panel',
+  name = 'MailR',
+  displayName = "MailR",
+  author = "pills, Sharlikran",
+  version = "2.5.14",
+  website = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
+  registerForDefaults = true,
+}
+
+local optionsData = {}
+optionsData[#optionsData + 1] = {
+  type = "header",
+  name = "MailR",
+  width = "full",
+}
+-- Open main window with mailbox scenes
+optionsData[#optionsData + 1] = {
+  type = 'checkbox',
+  name = "Disable Delete Confirmation",
+  tooltip = "Disable Delete Confirmation",
+  getFunc = function() return MailR.SavedMail.disableDeleteConfirmation end,
+  setFunc = function(value) MailR.SavedMail.disableDeleteConfirmation = value end,
+  default = MailR.SavedMail_defaults.disableDeleteConfirmation,
+}
+
+function MailR:InitLam()
+  LAM:RegisterAddonPanel('MailROptions', panelData)
+  LAM:RegisterOptionControls('MailROptions', optionsData)
+end
+
+-------------------------------------------------
+----- logger                                -----
+-------------------------------------------------
+
 MailR.show_log = false
 if LibDebugLogger then
-  logger = LibDebugLogger.Create(MailR.Name)
+  local logger = LibDebugLogger.Create(MailR.Name)
   MailR.logger = logger
 end
 local SDLV = DebugLogViewer
@@ -843,7 +885,7 @@ function MailR.FinishedGuildMail()
   local k, v = next(MailR.GuildRecipients)
   MailR.GuildRecipients = {}
   if MailR.CancelGuildMail and k ~= nil then
-    toStr = MailR.queuedSentMessage["recipient"]:gsub(" %([0-9]*%)", "")
+    local toStr = MailR.queuedSentMessage["recipient"]:gsub(" %([0-9]*%)", "")
     toStr = toStr .. " (" .. tostring(MailR.RecipientCount) .. "/" .. tostring(MailR.GuildRecipientCount) .. ")"
     MailR.queuedSentMessage["recipient"] = toStr
     MailR.MailSentSuccessfully()
@@ -1409,6 +1451,8 @@ function MailR:InitializeSendKeybindDescriptors()
 end
 
 function MailR.ConfirmDelete(self)
+  MailR.dm("Debug", "ConfirmDelete")
+  MailR.dm("Debug", mailId)
   if MailR.IsMailIdSentMail(self.mailId) then
     MailR.SavedMail.sent_messages[self.mailId] = nil
     MailR.SavedMail.sent_count = #MailR.SavedMail.sent_messages
@@ -1426,6 +1470,7 @@ end
 
 function MailR.Delete(self)
   MailR.dm("Debug", "Delete")
+  MailR.dm("Debug", self.mailId)
   if MailR.IsMailIdSentMail(self.mailId) then
     self:ConfirmDelete()
     return
@@ -1443,8 +1488,12 @@ function MailR.Delete(self)
       elseif attachedMoney > 0 then
         ZO_Dialogs_ShowDialog("DELETE_MAIL_MONEY", self.mailId)
       else
-        --no confirmation popup, immediately delete
-        self:ConfirmDelete()
+        if MailR.SavedMail.disableDeleteConfirmation then
+          --no confirmation popup, immediately delete
+          self:ConfirmDelete()
+        else
+          ZO_Dialogs_ShowDialog("DELETE_MAIL", { callback = function(...) self:ConfirmDelete(...) end, mailId = self.mailId })
+        end
       end
     end
   end
@@ -1457,7 +1506,7 @@ function MailR.IsMailDeletable(self)
 
   -- original
   local mailData = self:GetMailData(self.mailId)
-  if (mailData) then
+  if mailData then
     return mailData.attachedMoney == 0 and mailData.numAttachments == 0
   end
 end
@@ -1919,8 +1968,6 @@ function MailR.Init(eventCode, addOnName)
   EVENT_MANAGER:RegisterForEvent("MailR_SetMailboxInactive", EVENT_MAIL_CLOSE_MAILBOX, MailR.SetMailboxInactive)
   EVENT_MANAGER:RegisterForEvent("MailR_UpdateKeybindInfo", EVENT_KEYBINDING_SET, MailR.UpdateKeybindInfo)
   EVENT_MANAGER:RegisterForEvent("MailR_MailSentSuccessfully", EVENT_MAIL_SEND_SUCCESS, MailR.MailSentSuccessfully)
-  -- EVENT_MANAGER:RegisterForEvent("MailR_GuildMailSentSuccessfully", EVENT_MAIL_SEND_SUCCESS, MailR.GuildMailSent)
-  -- EVENT_MANAGER:RegisterForEvent("MailR_GuildMailSentUnsuccessfully", EVENT_MAIL_SEND_FAILED, MailR.GuildMailFailSent)
   EVENT_MANAGER:RegisterForEvent("MailR_AttachmentAdded", EVENT_MAIL_ATTACHMENT_ADDED, MailR.AttachmentAdded)
   EVENT_MANAGER:RegisterForEvent("MailR_AttachmentRemoved", EVENT_MAIL_ATTACHMENT_REMOVED, MailR.AttachmentRemoved)
   EVENT_MANAGER:RegisterForEvent("MailR_CODChanged", EVENT_MAIL_COD_CHANGED, MailR.CODChanged)
@@ -1931,7 +1978,18 @@ function MailR.Init(eventCode, addOnName)
   MailR.mailboxActive = false
   MailR.ClearCurrentSendMessage()
   MailR.SavedMail = ZO_SavedVars:New("SV_MailR_SavedMail", 1, nil, MailR.SavedMail_defaults)
-  MailR.SavedMail.guildMailVisible = false
+
+  local sv = SV_MailR_SavedMail.Default[GetDisplayName()][GetUnitName("player")]
+  -- Clean up saved variables (from previous versions)
+  for key, val in pairs(sv) do
+    -- Delete key-value pair if the key can't also be found in the default settings (except for version)
+    if key ~= "version" and MailR.SavedMail_defaults[key] == nil then
+      sv[key] = nil
+    end
+  end
+  MailR.SavedMail.disableDeleteConfirmation
+  MailR:InitLam()
+
   if MailR.SavedMail.display == nil then
     MailR.SavedMail.display = "all"
   end

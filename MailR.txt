@@ -1,12 +1,13 @@
 ## Title: MailR - Revised
-## APIVersion: 101038 101039
+## APIVersion: 101040 101041
 ## Author: Sharlikran Ravalox Darkshire, Calia1120 & pills
 ## SavedVariables: SV_MailR_SavedMail
-## Version: 2.5.12
-## AddOnVersion: 2512
+## Version: 2.5.14
+## AddOnVersion: 2514
 ## Description: MailR adds additional functionality to the Mail interface.
 ## OptionalDependsOn: LibDebugLogger>=196 DebugLogViewer MailBuddy>=304
 
-MailR.lua
 bindings.xml
 MailR.xml
+MailR.lua
+
