@@ -98,6 +98,7 @@ MailR.SavedMail_defaults = {
   inbox_messages = {},
   throttle_time = 1 --seconds (can be fractional)
 }
+MailR.MAX_READ_ATTACHMENTS = MailR.MAX_ATTACHMENTS + 1
 
 -- saved mail
 MailR.SavedMail = nil
@@ -267,7 +268,7 @@ function MailR.CreateForward()
 
   MailR.dm("Debug", "Creating Forward")
 
-  ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
+  -- ZO_MainMenuSceneGroupBarButton2.m_object.m_buttonData:callback()
   local fwdStr = MailR.localeStringMap[MailR.effective_lang]["Fwd: "]
   local replyString = MailR.currentMessageInfo["subject"]:gsub("^" .. fwdStr, "")
   ZO_MailSendSubjectField:SetText(fwdStr .. replyString)
@@ -291,7 +292,7 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   MailR.dm("Verbose", mailId)
   MailR.dm("Verbose", { GetMailItemInfo(idmailId) })
 
-  local senderDisplayName, senderCharacterName, subject, icon, unread,
+  local senderDisplayName, senderCharacterName, subject, mailItemIcon, unread,
   fromSystem, fromCustomerService, returned, numAttachments, attachedMoney,
   codAmount, expiresInDays, secsSinceReceived = GetMailItemInfo(mailId)
 
@@ -653,14 +654,14 @@ function MailR.OverloadMailInbox()
       return originalIsMailReturnable(mailId)
     end
   end
-  --[[ removed because it is not a ScrollList now
+  --[[ Many older functions were removed because it is not a ScrollList now
 
     MAIL_INBOX.RequestReadMessage = MailR.RequestReadMessage
     MAIL_INBOX.HasAlreadyReportedSelectedMail = MailR.HasAlreadyReportedSelectedMail
     ZO_MailInboxRow_OnMouseUp = MailR.OnMouseUp
     ZO_PlayerToPlayer.ShowPlayerInteractMenu = MailR.ShowPlayerInteractMenu
-  CHAT_SYSTEM.ShowPlayerContextMenu = MailR.ShowPlayerContextMenu
   ]]--
+  CHAT_SYSTEM.ShowPlayerContextMenu = MailR.ShowPlayerContextMenu
   MAIL_INBOX.IsMailDeletable = MailR.IsMailDeletable
   MAIL_INBOX.ConfirmDelete = MailR.ConfirmDelete
   MAIL_INBOX.Delete = MailR.Delete
@@ -969,16 +970,6 @@ function MailR.IsMailDeletable()
   return noAttachments
 end
 
-function MailR.GetMailAttachmentInfo(self, mailId)
-  MailR.dm("Debug", "GetMailAttachmentInfo")
-  if MailR.IsMailIdSentMail(mailId) then
-    local message = MailR.GetSentMessageFromMailId(mailId)
-    return message.numAttachments, message.gold
-  else
-    return select(9, GetMailItemInfo(mailId))
-  end
-end
-
 function MailR.RequestReadMessage(self, mailId)
   MailR.dm("Debug", "RequestReadMessage")
   -- this should not be called if mailId is a MAILR id, but the previously/currently selected
@@ -992,24 +983,6 @@ function MailR.RequestReadMessage(self, mailId)
   end
 end
 
-function GetMailFlags(mailId)
-  MailR.dm("Debug", "GetMailFlags")
-  local unread, returned, fromSystem, fromCustomerService = select(5, GetMailItemInfo(mailId))
-  return unread, returned, fromSystem, fromCustomerService
-end
-
-function GetMailAttachmentInfo(mailId)
-  MailR.dm("Debug", "GetMailAttachmentInfo")
-  local numAttachments, attachedMoney, codAmount = select(9, GetMailItemInfo(mailId))
-  return numAttachments, attachedMoney, codAmount
-end
-
-function GetMailSender(mailId)
-  MailR.dm("Debug", "GetMailSender")
-  local senderDisplayName, senderCharacterName = GetMailItemInfo(mailId)
-  return senderDisplayName, senderCharacterName
-end
-
 function MailR.IsMailIdSentMail(mailId)
   MailR.dm("Debug", "IsMailIdSentMail")
   if type(mailId) ~= "string" then return false end
@@ -1018,9 +991,13 @@ function MailR.IsMailIdSentMail(mailId)
   return true
 end
 
-
-
-MailR.MAX_READ_ATTACHMENTS = MailR.MAX_ATTACHMENTS + 1
+function MailR.GetSentMessageFromMailId(mailId)
+  if MailR.IsMailIdSentMail(mailId) then
+    return MailR.SavedMail.sent_messages[mailId]
+  else
+    return nil
+  end
+end
 
 function MailR.ConvertSavedMail()
   MailR.dm("Debug", "ConvertSavedMail")
