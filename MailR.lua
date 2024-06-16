@@ -266,7 +266,7 @@ end
 function MailR.InboxMessageSelected(eventCode, mailId)
   MailR.dm("Debug", "InboxMessageSelected")
   MailR.dm("Verbose", mailId)
-  MailR.dm("Verbose", { GetMailItemInfo(idmailId) })
+  MailR.dm("Verbose", { GetMailItemInfo(mailId) })
 
   local senderDisplayName, senderCharacterName, subject, mailItemIcon, unread,
   fromSystem, fromCustomerService, returned, numAttachments, attachedMoney,
@@ -877,7 +877,7 @@ end
 
 function MailR.ConfirmDelete(self)
   MailR.dm("Debug", "ConfirmDelete")
-  MailR.dm("Debug", mailId)
+  MailR.dm("Debug", self.mailId)
   if MailR.IsMailIdSentMail(self.mailId) then
     MailR.SavedMail.sent_messages[self.mailId] = nil
     MailR.SavedMail.sent_count = #MailR.SavedMail.sent_messages
