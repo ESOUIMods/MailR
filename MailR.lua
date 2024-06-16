@@ -42,39 +42,12 @@ MailR.supported_lang = MailR.client_lang == MailR.effective_lang
 -------------------------------------------------
 
 MailR.Name = "MailR"
--- Set to true if you want to see debug output to console/chat window
--- default mail color
---MailR.DEFAULT_EXPIRE_MAIL_COLOR_STRING = "|c2dc50e"
 MailR.DEFAULT_SAVE_MAIL_COLOR_STRING = "|c2dc50e"
 MailR.DEFAULT_SENT_MAIL_COLOR_STRING = "|c3689ef"
 MailR.DEFAULT_HEADER_COLOR_STRING = "|cd5b526"
 MailR.RESET_COLOR_STRING = "|r"
--- flag to say we havent overridden existing control handlers yet.
--- gets set to false after overriding handlers
-MailR.setHandlersOnFirstLoad = true
 -- are we in the mailbox UI
 MailR.mailboxActive = false
-MailR.guildies_visible = false
-MailR.guilds = {}
-MailR.guildranks = {}
-MailR.guildies = {}
-MailR.LastKnownRecipient = {}
-MailR.CurrentKnownGuild = {}
-MailR.LastKnownGuild = {}
-MailR.failed_guildies = {}
-MailR.GuildDropdown = nil
-MailR.GuildRankDropdown = nil
-MailR.GuildStatusDropdown = nil
-MailR.GuildLogicDropdown = nil
-MailR.GuildRecipients = {}
-MailR.GuildSendProgress = nil
-MailR.GuildThrottleTimer = nil
-MailR.ThrottleRecipients = 1
-MailR.ThrottledRecipients = 0
-MailR.RecipientCount = 0
-MailR.GuildRecipientCount = 0
-MailR.GuildMailRecipientsReady = false
-MailR.CancelGuildMail = true
 -- max mail attachments
 MailR.MAX_ATTACHMENTS = 6
 -- table to store the keybind info
@@ -99,6 +72,9 @@ MailR.SavedMail_defaults = {
   throttle_time = 1 --seconds (can be fractional)
 }
 MailR.MAX_READ_ATTACHMENTS = MailR.MAX_ATTACHMENTS + 1
+
+--[[TODO Don't think this is truly needed ]]--
+MailR.guildies = {}
 
 -- saved mail
 MailR.SavedMail = nil
@@ -184,7 +160,7 @@ local ShowPlayerInteractMenu_Orig = ZO_PlayerToPlayer.ShowPlayerInteractMenu
 ----- logger                                -----
 -------------------------------------------------
 
-MailR.show_log = true
+MailR.show_log = false
 if LibDebugLogger then
   local logger = LibDebugLogger.Create(MailR.Name)
   MailR.logger = logger
@@ -311,13 +287,14 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   MailR.currentMessageInfo["numAttachments"] = numAttachments
   MailR.currentMessageInfo["secsSinceReceived"] = secsSinceReceived
   MailR.currentMessageInfo["timeSent"] = GetTimeStamp() - secsSinceReceived
-  MailR.currentMessageInfo["attachments"] = {}
   MailR.currentMessageInfo["gold"] = 0
   MailR.currentMessageInfo["cod"] = false
   MailR.currentMessageInfo["postage"] = 0
   MailR.currentMessageInfo["mailId"] = mailId
+  -- Initialize attachments table with empty tables
+  MailR.currentMessageInfo["attachments"] = {}
   for a = 1, MailR.MAX_ATTACHMENTS do
-    table.insert(MailR.currentMessageInfo["attachments"], {})
+    MailR.currentMessageInfo["attachments"][a] = {}
   end
   --[[ we dont do anything with this information yet
   if not MailR.IsMailIdSentMail(mailId) then
@@ -345,7 +322,7 @@ function MailR.InboxMessageSelected(eventCode, mailId)
   ]]--
   -- shoud we include the body of the original message? Is there a message limit?
 
-  -- this doesnt seem to return what I expect so use whats below
+  -- this doesn't seem to return what I expect so use whats below
   --if IsMailReturnable(mailId) then
   -- some messages you cant reply to (e.g. system messages)
   if senderDisplayName == nil or senderDisplayName == "" or fromSystem or MailR.IsMailIdSentMail(mailId) then
@@ -416,11 +393,8 @@ end
 -- somebody updated their keybinds so we should probably update too
 function MailR.UpdateKeybindInfo(eventCode)
   MailR.dm("Debug", "UpdateKeybindInfo")
-  local replyKeybind = MailR.GetPrimaryKeybindInfo(GetString(SI_KEYBINDINGS_LAYER_GENERAL), "MailR",
-    "MAIL_REPLY")
   local forwardKeybind = MailR.GetPrimaryKeybindInfo(GetString(SI_KEYBINDINGS_LAYER_GENERAL), "MailR",
     "MAIL_FORWARD")
-  MailR.keybindInfo["REPLY"] = replyKeybind
   MailR.keybindInfo["FORWARD"] = forwardKeybind
 end
 
@@ -460,7 +434,6 @@ end
 function MailR.MailSentSuccessfully(eventCode, playerName)
   MailR.dm("Debug", "MailSentSuccessfully")
   if next(MailR.queuedSentMessage) == nil then return end
-  if next(MailR.GuildRecipients) ~= nil then return end
   MailR.queuedSentMessage["timeSent"] = GetTimeStamp()
   if MailR.rtrim(MailR.queuedSentMessage["subject"]) == "" then
     MailR.queuedSentMessage["subject"] = "(No Subject)"
@@ -490,8 +463,10 @@ function MailR.ClearCurrentSendMessage()
   MailR.currentSendMessageInfo["postage"] = 0
   MailR.currentSendMessageInfo["timeSent"] = 0
   MailR.currentSendMessageInfo["attachments"] = {}
+  -- Initialize attachments table with empty tables
+  MailR.currentSendMessageInfo["attachments"] = {}
   for a = 1, MailR.MAX_ATTACHMENTS do
-    table.insert(MailR.currentSendMessageInfo["attachments"], {})
+    MailR.currentSendMessageInfo["attachments"][a] = {}
   end
 end
 
@@ -544,7 +519,7 @@ function MailR.AttachmentMoneyChanged(eventCode, gold)
 end
 
 -- called when changed from gold payment to COD
-function MailR.CODChanged()
+function MailR.CODChanged(eventCode, codAmount)
   MailR.dm("Debug", "CODChanged")
   if GetQueuedCOD() > 0 then
     MailR.currentSendMessageInfo["cod"] = true
@@ -560,15 +535,6 @@ function MailR.QueueSentMessage()
   MailR.dm("Debug", "QueueSentMessage")
   MailR.queuedSentMessage = {}
   MailR.queuedSentMessage = MailR.CopyMessage(MailR.currentSendMessageInfo)
-  if MailR.guildies_visible then
-    MailR.queuedSentMessage["gold"] = 0
-    MailR.queuedSentMessage["cod"] = false
-    MailR.queuedSentMessage["postage"] = 0
-    MailR.queuedSentMessage["attachments"] = {}
-    for a = 1, MailR.MAX_ATTACHMENTS do
-      table.insert(MailR.queuedSentMessage["attachments"], {})
-    end
-  end
 end
 
 function MailR.OnMouseUp(control, button, upInside)
@@ -692,22 +658,15 @@ end
 
 function MailR.Guild_MouseUp(control, button, upInside)
   MailR.dm("Debug", "Guild_MouseUp")
-  -- contro.data.name, etc
+  --[[TODO not sure what the MouseUp feature was supposed to do]]--
+  local name = control.data.name
   local pressed_button = 1
   local api_ver = GetAPIVersion()
 
   if api_ver > 100011 then pressed_button = MOUSE_BUTTON_INDEX_LEFT end
 
   if button == pressed_button then
-
-    local name = control.data.name
-    if MailR.guildies[name]["recipient"] then
-      MailR.guildies[name]["recipient"] = false
-    else
-      MailR.guildies[name]["recipient"] = true
-    end
     MailR.GuildControl:RefreshVisible()
-
   end
   --MailR.Guild:MouseEnter(control, button, upInside)
 end
@@ -1058,10 +1017,8 @@ function MailR.Init(eventCode, addOnName)
   end
   math.randomseed(GetTimeStamp())
 
-  local replySettingStr = MailR.localeStringMap[MailR.effective_lang]["Reply To Message"]
   local forwardSettingStr = MailR.localeStringMap[MailR.effective_lang]["Forward Message"]
   local mailSaveStr = MailR.localeStringMap[MailR.effective_lang]["Save Mail"]
-  ZO_CreateStringId("SI_BINDING_NAME_MAIL_REPLY", replySettingStr)
   ZO_CreateStringId("SI_BINDING_NAME_MAIL_FORWARD", forwardSettingStr)
   ZO_CreateStringId("SI_BINDING_NAME_MAIL_SAVE", mailSaveStr)
 
