@@ -1,7 +1,7 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.13
+Version: 2.5.14
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
@@ -199,7 +199,7 @@ local panelData = {
   name = 'MailR',
   displayName = "MailR",
   author = "pills, Sharlikran",
-  version = "2.5.13",
+  version = "2.5.14",
   website = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
   registerForDefaults = true,
 }
@@ -229,7 +229,7 @@ end
 ----- logger                                -----
 -------------------------------------------------
 
-MailR.show_log = true
+MailR.show_log = false
 if LibDebugLogger then
   logger = LibDebugLogger.Create(MailR.Name)
   MailR.logger = logger
