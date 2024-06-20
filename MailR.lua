@@ -1,11 +1,10 @@
 --[[
 Title: MailR
 Description: MailR is a supplemental addon for the ESO in-game mail system.
-Version: 2.5.14
+Version: 2.5.16
 Original Author: pills
 Previous Authors: calia1120, Ravalox Darkshire
 ]]
-local LAM = LibAddonMenu2
 
 -- GLOBALS
 MailR = {}
@@ -95,7 +94,6 @@ MailR.SAVED_MAIL_VERSION = "2.0"
 -- default table for above version incase this the first time MailR is used
 MailR.SavedMail_defaults = {
   display = "all",
-  disableDeleteConfirmation = true,
   mailr_version = MailR.SAVED_MAIL_VERSION,
   sent_count = 0,
   sent_messages = {},
@@ -191,47 +189,12 @@ local GetNextMailId_Orig = GetNextMailId
 local ShowPlayerInteractMenu_Orig = ZO_PlayerToPlayer.ShowPlayerInteractMenu
 
 -------------------------------------------------
------ settings                              -----
--------------------------------------------------
-
-local panelData = {
-  type = 'panel',
-  name = 'MailR',
-  displayName = "MailR",
-  author = "pills, Sharlikran",
-  version = "2.5.14",
-  website = "https://www.esoui.com/downloads/info2974-MailR-Revised.html",
-  registerForDefaults = true,
-}
-
-local optionsData = {}
-optionsData[#optionsData + 1] = {
-  type = "header",
-  name = "MailR",
-  width = "full",
-}
--- Open main window with mailbox scenes
-optionsData[#optionsData + 1] = {
-  type = 'checkbox',
-  name = "Disable Delete Confirmation",
-  tooltip = "Disable Delete Confirmation",
-  getFunc = function() return MailR.SavedMail.disableDeleteConfirmation end,
-  setFunc = function(value) MailR.SavedMail.disableDeleteConfirmation = value end,
-  default = MailR.SavedMail_defaults.disableDeleteConfirmation,
-}
-
-function MailR:InitLam()
-  LAM:RegisterAddonPanel('MailROptions', panelData)
-  LAM:RegisterOptionControls('MailROptions', optionsData)
-end
-
--------------------------------------------------
 ----- logger                                -----
 -------------------------------------------------
 
 MailR.show_log = false
 if LibDebugLogger then
-  logger = LibDebugLogger.Create(MailR.Name)
+  local logger = LibDebugLogger.Create(MailR.Name)
   MailR.logger = logger
 end
 local SDLV = DebugLogViewer
@@ -305,12 +268,15 @@ function MailR.CreateReply()
   if not MailR.mailboxActive then return end
   if SCENE_MANAGER.currentScene.name ~= "mailInbox" then return end
 
-  if MailR.IsMailIdSentMail(MAIL_INBOX.mailId) then
-    local sentMail = MailR.SavedMail.sent_messages[MAIL_INBOX.mailId]["isSentMail"]
+  local mailId = MAIL_INBOX.mailId
+  if not mailId then return end
+
+  if MailR.IsMailIdSentMail(mailId) then
+    local sentMail = MailR.SavedMail.sent_messages[mailId]["isSentMail"]
     if sentMail == nil or sentMail == true then
       return
     end
-    local isReturnable = MailR.SavedMail.sent_messages[MAIL_INBOX.mailId]["returnable"]
+    local isReturnable = MailR.SavedMail.sent_messages[mailId]["returnable"]
     if isReturnable == nil or isReturnable == false then
       return
     end
@@ -1357,6 +1323,33 @@ function MailR.InitializeInboxKeybindDescriptors(self)
       end
     },
 
+    --Take All
+    {
+      name = function()
+        if self.mailId then
+          local mailData = self:GetMailData(self.mailId)
+          return GetString("SI_MAILCATEGORY_TAKEALL", mailData.category)
+        end
+      end,
+      keybind = "UI_SHORTCUT_QUATERNARY",
+      callback = function()
+        if self.mailId then
+          local mailData = self:GetMailData(self.mailId)
+          ZO_Dialogs_ShowPlatformDialog("MAIL_CONFIRM_TAKE_ALL", { category = mailData.category })
+        end
+      end,
+      visible = function()
+        if self.mailId then
+          local mailData = self:GetMailData(self.mailId)
+          if mailData then
+            local canTakeAttachments = CanTryTakeAllMailAttachmentsInCategory(mailData.category, MAIL_MANAGER:ShouldDeleteOnClaim())
+            return canTakeAttachments
+          end
+        end
+        return false
+      end,
+    },
+
     --Report Player
     {
       name = GetString(SI_MAIL_READ_REPORT_PLAYER),
@@ -1460,55 +1453,50 @@ function MailR.ConfirmDelete(self)
     MAIL_INBOX:RefreshData()
     return
   end
-
-  -- original
-  if self.mailId and not IsMailReturnable(self.mailId) then
-    DeleteMail(self.mailId, true)
-    PlaySound(SOUNDS.MAIL_ITEM_DELETED)
-  end
+  MailR.dm("Warn", "Shit Hit The Fan!")
 end
 
 function MailR.Delete(self)
   MailR.dm("Debug", "Delete")
   MailR.dm("Debug", self.mailId)
   if MailR.IsMailIdSentMail(self.mailId) then
-    self:ConfirmDelete()
+    self.ConfirmDelete()
     return
   end
 
   -- original
   if self.mailId then
-    if self:IsMailDeletable() then
-      local numAttachments, attachedMoney = GetMailAttachmentInfo(self.mailId)
-
-      if numAttachments > 0 and attachedMoney > 0 then
-        ZO_Dialogs_ShowDialog("DELETE_MAIL_ATTACHMENTS_AND_MONEY", self.mailId)
-      elseif numAttachments > 0 then
-        ZO_Dialogs_ShowDialog("DELETE_MAIL_ATTACHMENTS", self.mailId)
-      elseif attachedMoney > 0 then
-        ZO_Dialogs_ShowDialog("DELETE_MAIL_MONEY", self.mailId)
-      else
-        if MailR.SavedMail.disableDeleteConfirmation then
-          --no confirmation popup, immediately delete
-          self:ConfirmDelete()
-        else
-          ZO_Dialogs_ShowDialog("DELETE_MAIL", { callback = function(...) self:ConfirmDelete(...) end, mailId = self.mailId })
-        end
-      end
+    if self.IsMailDeletable() then
+      DeleteMail(self.mailId)
+    else
+    if MAIL_MANAGER.savedVars.deleteOnClaim then
+    else
+    end
+      ZO_Dialogs_ShowPlatformDialog(
+        "DELETE_MAIL",
+        {
+          confirmationCallback = function(...)
+            DeleteMail(self.mailId)
+            PlaySound(SOUNDS.MAIL_ITEM_DELETED)
+          end,
+          mailId = self.mailId,
+        }
+      )
     end
   end
 end
 
-function MailR.IsMailDeletable(self)
-  if MailR.IsMailIdSentMail(self.mailId) then
+function MailR.IsMailDeletable()
+  local mailId = MAIL_INBOX.mailId
+  if not mailId then return end
+  if MailR.IsMailIdSentMail(mailId) then
     return true
   end
 
-  -- original
-  local mailData = self:GetMailData(self.mailId)
-  if mailData then
-    return mailData.attachedMoney == 0 and mailData.numAttachments == 0
-  end
+  -- To mimic original ZOS function
+  local numAttachments, attachedMoney = GetMailAttachmentInfo(mailId)
+  local noAttachments = numAttachments == 0 and attachedMoney == 0
+  return noAttachments
 end
 
 function MailR.GetMailItemInfo(mailId)
@@ -1989,8 +1977,7 @@ function MailR.Init(eventCode, addOnName)
       sv[key] = nil
     end
   end
-
-  MailR:InitLam()
+  MailR.SavedMail.disableDeleteConfirmation = nil -- Removed for U42
 
   if MailR.SavedMail.display == nil then
     MailR.SavedMail.display = "all"
